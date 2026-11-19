@@ -1,0 +1,2064 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HF класификатор</title>
+<link rel="icon" type="image/png" href="/icon.png">
+<style>
+:root {
+  --bg: #f4f6f9; --panel: #ffffff; --panel2: #f8fafc; --text: #18202c; --muted: #5b6575; --line: #dfe3ea;
+  --accent: #2563eb; --accent-text: #ffffff; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+  --sel: #fff4c2; --chip: #eef2f7; --dec: #86efac; --und: #fdba74; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f141b; --panel: #171e27; --panel2: #1c2430; --text: #e4e9f0; --muted: #96a1b2; --line: #2a3442;
+          --accent: #60a5fa; --accent-text: #0b1220; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --sel: #3a3416; --chip: #222c39;
+          --shadow: 0 1px 2px rgba(0,0,0,.4); }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+button.icon { padding: 6px 10px; }
+input, select { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 8px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); }
+
+/* Top bar */
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap;
+  padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 16px; }
+.brand img { width: 26px; height: 26px; border-radius: 6px; }
+.status { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px; background: var(--chip); font-size: 13px; }
+.status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.status.ok .dot { background: var(--ok); } .status.warn .dot { background: var(--warn); } .status.bad .dot { background: var(--bad); }
+.status.busy .dot { background: var(--warn); animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.spacer { flex: 1; }
+.top-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Banner */
+.banner { margin: 14px 18px 0; padding: 14px 18px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line);
+  border-left: 5px solid var(--warn); box-shadow: var(--shadow); }
+.banner.bad { border-left-color: var(--bad); } .banner.info { border-left-color: var(--accent); }
+.banner h2 { margin: 0 0 6px; font-size: 16px; }
+.banner ol { margin: 6px 0 10px; padding-left: 22px; } .banner li { margin: 3px 0; }
+.banner .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+main { padding: 14px 18px 24px; display: grid; gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; }
+.card > .head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.card > .head h2 { margin: 0; font-size: 14px; font-weight: 650; }
+.card > .body { padding: 12px 14px; }
+
+/* Receivers */
+.rx .head .info { color: var(--muted); font-size: 13px; }
+.lane { position: relative; height: 30px; margin: 0 14px; }
+.bar { position: absolute; top: 4px; height: 22px; border-radius: 4px; font: 11px/22px var(--mono); padding: 0 4px; white-space: nowrap;
+  overflow: hidden; cursor: pointer; color: #111; min-width: 4px; border: 1px solid rgba(0,0,0,.15); }
+.bar.dec { background: var(--dec); } .bar.und { background: var(--und); }
+.bar.sel { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 2; }
+.bar.narrow { padding: 0; }
+.lanetag { position: absolute; top: 7px; z-index: 3; background: var(--panel); padding: 0 3px; border-radius: 3px; font: 11px/16px var(--mono); color: var(--muted); white-space: nowrap; pointer-events: none; }
+.marks { position: relative; height: 40px; margin: 4px 14px 0; overflow: hidden; }
+.mark { position: absolute; height: 17px; font: 11px/17px var(--sans, system-ui); padding: 0 5px; border-radius: 3px 3px 3px 0; white-space: nowrap;
+  cursor: pointer; color: #10202e; border-left: 2px solid rgba(0,0,0,.55); max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+.mark.tick { width: 0; padding: 0; top: 30px; height: 10px; border-radius: 0; }
+.mark.ut { background: #7dd3fc; } .mark.bc { background: #cbd5e1; } .mark.ts { background: #fde68a; } .mark.ot { background: #c4b5fd; }
+.mark.off { opacity: .45; } .mark:hover { outline: 2px solid var(--accent); z-index: 3; }
+.mark.my { background: #fcd34d; border-left-color: #92400e; font-weight: 600; }
+.dlitems div { font-size: 13px; } .dlitems .ok { color: var(--ok); } .dlitems .bad { color: var(--bad); }
+.rec[hidden] { display: none; }
+.rec { display: inline-flex; align-items: center; gap: 8px; color: var(--bad); font-weight: 600; font-size: 13px; }
+.rec i { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+dialog.big { width: min(900px, calc(100vw - 32px)); }
+.dbrow { display: flex; gap: 10px; align-items: center; padding: 4px 0; }
+.dbrow .n { color: var(--muted); font-size: 13px; }
+.found { margin-top: 8px; max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.found div { display: flex; gap: 10px; padding: 4px 10px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13px; }
+.found div:hover { background: var(--panel2); } .found .f { font-family: var(--mono); min-width: 84px; text-align: right; }
+.found .src { color: var(--muted); margin-left: auto; white-space: nowrap; }
+.task { border-top: 1px solid var(--line); padding: 8px 0; }
+.task .thead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.task .thead b { font-weight: 650; } .task .have { color: var(--muted); font-size: 13px; } .task .have.done { color: var(--ok); }
+.fq { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.fq button { padding: 2px 8px; font: 12px var(--mono); border-radius: 999px; background: var(--chip); }
+.fq button.off { opacity: .5; }
+.tasks h3 { font-size: 14px; margin: 16px 0 2px; } .tasks h3 + p { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
+a.pic { display: block; margin: 4px 0; } a.pic img { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; display: block; background: #fff; }
+.usebar { display: grid; grid-template-columns: 260px 1fr 70px; gap: 8px; align-items: center; font-size: 13px; margin: 2px 0; }
+.usebar .b { height: 12px; background: var(--chip); border-radius: 6px; overflow: hidden; }
+.usebar .b i { display: block; height: 100%; background: var(--accent); }
+.usebar .v { text-align: right; font-family: var(--mono); }
+.restable td, .restable th { padding: 4px 8px; font-size: 13px; }
+.restable td.dec { white-space: normal; max-width: 260px; color: var(--muted); }
+.rescontrols { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 16px; }
+.rescontrols label { display: grid; gap: 3px; font-size: 13px; }
+.decfams { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
+.decfams label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.wfwrap { position: relative; margin: 0 14px; }
+canvas.wf { width: 100%; height: 240px; display: block; border-radius: 6px; background: #050b16; cursor: crosshair; image-rendering: pixelated; }
+.wfhint { position: absolute; left: 10px; bottom: 8px; color: #c8d3e3; font-size: 12px; background: rgba(5,11,22,.6); padding: 2px 8px; border-radius: 6px; pointer-events: none; }
+.axis { position: relative; height: 22px; margin: 2px 14px 10px; font: 11px var(--mono); color: var(--muted); }
+.axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; border: 1px solid rgba(0,0,0,.15); }
+
+/* Emissions + details */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; align-items: start; }
+@media (max-width: 1100px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.filters input[type=search] { min-width: 200px; flex: 1; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border-radius: 999px; padding: 3px 11px; font-size: 13px; background: var(--chip); border: 1px solid transparent; }
+.chip.on { background: var(--accent); color: var(--accent-text); }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.tablewrap { max-height: 460px; overflow: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+th { position: sticky; top: 0; background: var(--panel2); font-weight: 600; font-size: 12px; color: var(--muted); z-index: 1; }
+td.num { text-align: right; font-family: var(--mono); }
+td.text { white-space: normal; font-family: var(--mono); min-width: 220px; max-width: 520px; color: var(--muted); }
+tbody tr { cursor: pointer; } tbody tr:hover td { background: var(--panel2); }
+tr.sel td { background: var(--sel) !important; }
+tr.ended td:not(.text) { color: var(--muted); }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--dec); color: #0f2a17; }
+ul.consistent { margin: 4px 0 2px; padding-left: 18px; font-size: 13px; }
+ul.consistent li { margin: 2px 0; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; border: 1px solid rgba(0,0,0,.15); }
+.swatch.dec { background: var(--dec); } .swatch.und { background: var(--und); }
+.tag.und { background: var(--chip); color: var(--muted); font-weight: 500; }
+.onair { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 6px; vertical-align: 1px; }
+.empty { padding: 26px 14px; text-align: center; color: var(--muted); }
+
+.details .freq { font: 600 24px/1.2 var(--mono); }
+.details dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 12px 0; font-size: 13px; }
+.details dt { color: var(--muted); } .details dd { margin: 0; font-family: var(--mono); }
+.details .textbox { font: 13px/1.5 var(--mono); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.details .listen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.details .listen label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.details .listen .wide { grid-column: 1 / -1; }
+.note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+.log { font: 12.5px/1.55 var(--mono); max-height: 320px; overflow: auto; padding: 6px 14px; }
+.log div { border-bottom: 1px dotted var(--line); padding: 3px 0; white-space: pre-wrap; word-break: break-word; }
+.log .time { color: var(--muted); }
+
+/* Dialogs */
+dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; background: var(--panel); color: var(--text);
+  width: min(620px, calc(100vw - 32px)); box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+dialog::backdrop { background: rgba(10,15,25,.45); }
+dialog .dhead { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+dialog .dhead h2 { margin: 0; font-size: 17px; flex: 1; }
+dialog .dbody { padding: 14px 18px; max-height: 70vh; overflow: auto; }
+dialog .dfoot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+fieldset { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 14px; padding: 10px 14px 12px; }
+legend { font-weight: 650; padding: 0 6px; }
+.field { display: grid; gap: 4px; margin: 8px 0; align-content: start; }
+.field > span { font-size: 13px; font-weight: 550; }
+.field small { color: var(--muted); }
+.check { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; }
+.check small { display: block; color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.formerr { color: var(--bad); font-size: 13px; min-height: 1.3em; }
+.help h3 { font-size: 14px; margin: 14px 0 4px; } .help p, .help ul { margin: 4px 0 8px; } .help li { margin: 2px 0; }
+
+#toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #1f2937; color: #f9fafb; padding: 10px 18px;
+  border-radius: 10px; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; z-index: 20; }
+#toast.show { opacity: 1; } #toast.bad { background: #7f1d1d; }
+.diaglog { max-height: 14em; overflow: auto; font-size: 12px; background: var(--panel); padding: .5em; white-space: pre; }
+#diagResult a { word-break: break-all; }
+button.loadchip { border: 0; cursor: pointer; font: inherit; font-size: 13px; color: inherit; }
+button.loadchip[aria-expanded="true"] { outline: 2px solid var(--accent); }
+.loadpanel { position: fixed; top: 58px; left: 18px; z-index: 40; width: min(680px, calc(100vw - 36px)); max-height: 72vh; overflow: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0,0,0,.18); padding: 14px 18px; }
+.loadpanel h2 { margin: 0 0 8px; font-size: 16px; } .loadpanel h3 { margin: 12px 0 4px; font-size: 14px; }
+.loadpanel .lag { color: var(--bad); font-weight: 600; }
+.loadpanel .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ptag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.ptag.try { color: var(--text); border: 1px dashed var(--line); } .ptag.left { opacity: .75; }
+.wins { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.win { position: absolute; top: 0; bottom: 0; border-left: 1px solid; border-right: 1px solid; }
+.win.dec { background: rgba(74,222,128,.13); border-color: rgba(74,222,128,.7); }
+.win.none { background: repeating-linear-gradient(135deg, rgba(148,163,184,.28) 0 6px, rgba(148,163,184,.08) 6px 12px); border-color: rgba(148,163,184,.8); }
+.win button { pointer-events: auto; position: absolute; top: 4px; left: 2px; max-width: calc(100% - 4px); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: rgba(5,11,22,.75); color: #e6edf6; border: 0; }
+.dragsel { position: absolute; top: 0; bottom: 0; background: rgba(96,165,250,.25); border: 1px dashed #60a5fa; pointer-events: none; }
+canvas.wf { cursor: crosshair; touch-action: pan-y; }
+.winlist { display: grid; gap: 4px; margin: 4px 0 8px; } .winlist div { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.winlist span.f { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="/icon.png" alt=""><span data-t="appName"></span></div>
+  <div id="status" class="status busy" role="status"><span class="dot"></span><span id="statusText"></span></div>
+  <button id="loadChip" class="status loadchip" aria-expanded="false" aria-controls="loadPanel" hidden><span class="dot"></span><span id="loadText"></span></button>
+  <div class="spacer"></div>
+  <div class="top-actions">
+    <select id="lang" aria-label="Language / Език">
+      <option value="bg">Български</option>
+      <option value="en">English</option>
+    </select>
+    <button id="openDb" data-t="freqs" data-t-title="freqsTip"></button>
+    <button id="openTasks" data-t="tasks" data-t-title="tasksTip"></button>
+    <button id="openSettings" class="icon" data-t-title="settings">⚙ <span data-t="settings"></span></button>
+    <button id="openHelp" class="icon" data-t-title="help">? <span data-t="help"></span></button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+<div id="loadPanel" class="loadpanel" role="region" aria-labelledby="loadTitle" hidden></div>
+
+<main>
+  <div id="receivers"></div>
+
+  <div class="split">
+    <section class="card">
+      <div class="head">
+        <h2 data-t="emissions"></h2><span id="emCount" class="muted"></span>
+        <div class="spacer"></div>
+        <button id="searchLog" data-t="searchLog" data-t-title="searchLogTip"></button>
+        <button id="export" data-t="export"></button>
+      </div>
+      <div class="filters">
+        <input id="fText" type="search" data-t-placeholder="searchText">
+        <label class="toggle"><input id="fActive" type="checkbox"> <span data-t="onAirOnly"></span></label>
+        <div id="chips" class="chips"></div>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr id="emHead"></tr></thead>
+          <tbody id="emBody"></tbody>
+        </table>
+        <div id="emEmpty" class="empty"></div>
+      </div>
+    </section>
+
+    <aside class="card details">
+      <div class="head"><h2 data-t="selected"></h2></div>
+      <div class="body" id="details"></div>
+    </aside>
+  </div>
+
+  <section class="card">
+    <div class="head"><h2 data-t="decodes"></h2><span class="muted" data-t="decodesNote"></span></div>
+    <div id="log" class="log"></div>
+    <div id="logEmpty" class="empty"></div>
+  </section>
+</main>
+
+<dialog id="settingsDlg" aria-labelledby="settingsTitle">
+  <form method="dialog" id="settingsForm">
+    <div class="dhead"><h2 id="settingsTitle" data-t="settings"></h2></div>
+    <div class="dbody">
+      <fieldset>
+        <legend data-t="sLanguage"></legend>
+        <select name="language" class="field">
+          <option value="" data-t="sLangAuto"></option>
+          <option value="bg">Български</option>
+          <option value="en">English</option>
+        </select>
+      </fieldset>
+      <fieldset id="sdrSettings">
+        <legend>SDRconnect</legend>
+        <div class="row2">
+          <label class="field"><span data-t="sHost"></span><input name="sdr_host" autocomplete="off" spellcheck="false"><small data-t="sHostNote"></small></label>
+          <label class="field"><span data-t="sPort"></span><input name="sdr_port" type="number" min="1" max="65535"><small data-t="sPortNote"></small></label>
+        </div>
+        <label class="field"><span data-t="sTuner"></span>
+          <select name="tuner">
+            <option value="1" data-t="sTuner1"></option>
+            <option value="2" data-t="sTuner2"></option>
+            <option value="both" data-t="sTunerBoth"></option>
+          </select>
+        </label>
+        <label class="field"><span data-t="sSerial"></span><input name="dual_serial" autocomplete="off" spellcheck="false"><small data-t="sSerialNote"></small></label>
+        <label class="check"><input name="start_headless" type="checkbox"><span><span data-t="sHeadless"></span><small data-t="sHeadlessNote"></small></span></label>
+        <label class="field"><span data-t="sHeadlessPath"></span><input name="headless_path" spellcheck="false" data-t-placeholder="sHeadlessPathAuto"></label>
+      </fieldset>
+      <fieldset>
+        <legend data-t="sProgram"></legend>
+        <label class="check"><input name="open_window" type="checkbox"><span><span data-t="sOpenWindow"></span><small data-t="sOpenWindowNote"></small></span></label>
+        <label class="check"><input name="ft8" type="checkbox"><span><span data-t="sFt8"></span><small data-t="sAfterRestart"></small></span></label>
+        <label class="field"><span data-t="sHttpPort"></span><input name="http_port" type="number" min="1" max="65535"><small data-t="sAfterRestart"></small></label>
+        <p class="note"><span data-t="sDataFolder"></span> <span id="logPath" class="mono"></span></p>
+        <p><button type="button" id="openDiag" data-t="diagOpen"></button> <small class="muted" data-t="diagOpenNote"></small></p>
+      </fieldset>
+      <fieldset id="procSettings">
+        <legend data-t="sProcessing"></legend>
+        <p class="note" data-t="sProcNote"></p>
+        <div class="row2">
+          <label class="field"><span data-t="resMax"></span><input name="max_sessions" type="number" min="1" max="500"></label>
+          <label class="field"><span data-t="resGiveUp"></span><input name="give_up_seconds" type="number" min="0" max="86400"></label>
+        </div>
+        <label class="field"><span data-t="resMinSnr"></span><input name="min_snr_db" type="number" min="-20" max="60"></label>
+        <label class="check"><input name="measure_unknown" type="checkbox"><span><span data-t="resUnknown"></span><small data-t="resUnknownTip"></small></span></label>
+        <div class="note" data-t="resDecoders"></div>
+        <div id="sFamilies" class="decfams"></div>
+        <div class="note" data-t="sWindows"></div>
+        <div id="sWindows" class="winlist"></div>
+      </fieldset>
+      <div id="settingsErr" class="formerr" role="alert"></div>
+    </div>
+    <div class="dfoot">
+      <button value="cancel" formnovalidate data-t="cancel"></button>
+      <button id="saveSettings" class="primary" value="save" data-t="save"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="helpDlg" aria-labelledby="helpTitle">
+  <div class="dhead"><h2 id="helpTitle" data-t="help"></h2></div>
+  <div class="dbody help" id="helpBody"></div>
+  <div class="dfoot"><button id="closeHelp" class="primary" data-t="close"></button></div>
+</dialog>
+
+<dialog id="dbDlg" class="big" aria-labelledby="dbTitle">
+  <div class="dhead"><h2 id="dbTitle" data-t="dbTitle"></h2></div>
+  <div class="dbody" id="dbBody"></div>
+  <div class="dfoot"><button id="closeDb" class="primary" data-t="close"></button></div>
+</dialog>
+
+<dialog id="winDlg" aria-labelledby="winTitle">
+  <form method="dialog" id="winForm">
+    <div class="dhead"><h2 id="winTitle"></h2></div>
+    <div class="dbody">
+      <div class="row2">
+        <label class="field"><span data-t="winFrom"></span><input name="lo" type="number" step="0.001" min="1" max="3000000" required></label>
+        <label class="field"><span data-t="winTo"></span><input name="hi" type="number" step="0.001" min="1" max="3000000" required></label>
+      </div>
+      <label class="field"><span data-t="winWhat"></span><select name="decoder"></select></label>
+      <div id="winRtty" class="row2" hidden>
+        <label class="field"><span data-t="winBaud"></span><input name="baud" type="number" step="0.01" min="30" max="300"></label>
+        <label class="field"><span data-t="winShift"></span><input name="shift" type="number" step="1" min="50" max="1100"></label>
+      </div>
+      <p class="note" data-t="winNote"></p>
+      <div id="winErr" class="formerr" role="alert"></div>
+    </div>
+    <div class="dfoot">
+      <button type="button" id="winDelete" data-t="mkDelete"></button>
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate data-t="cancel"></button>
+      <button value="save" class="primary" data-t="save"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="markerDlg" aria-labelledby="markerTitle">
+  <form method="dialog" id="markerForm">
+    <div class="dhead"><h2 id="markerTitle"></h2></div>
+    <div class="dbody">
+      <label class="field"><span data-t="mkFreq"></span><input name="khz" type="number" step="0.001" min="3" max="3000000" required></label>
+      <label class="field"><span data-t="mkLabel"></span><input name="label" maxlength="80" required></label>
+      <label class="field"><span data-t="mkNote"></span><input name="note" maxlength="300"></label>
+      <label class="field"><span data-t="mode"></span><select name="demod"><option value="">-</option><option>USB</option><option>LSB</option><option>CW</option><option>AM</option></select></label>
+      <label class="field"><span data-t="mkDecoder"></span><select name="decoder"></select><small data-t="mkDecoderNote"></small></label>
+      <p class="note" data-t="mkHint"></p>
+      <div id="markerErr" class="formerr" role="alert"></div>
+    </div>
+    <div class="dfoot">
+      <button type="button" id="markerDelete" data-t="mkDelete"></button>
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate data-t="cancel"></button>
+      <button value="save" class="primary" data-t="save"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="tasksDlg" class="big" aria-labelledby="tasksTitle">
+  <div class="dhead"><h2 id="tasksTitle" data-t="tasksTitle"></h2></div>
+  <div class="dbody tasks" id="tasksBody"></div>
+  <div class="dfoot"><button id="closeTasks" class="primary" data-t="close"></button></div>
+</dialog>
+
+
+<dialog id="diagDlg" aria-labelledby="diagTitle">
+  <div class="dhead"><h2 id="diagTitle" data-t="diagTitle"></h2></div>
+  <div class="dbody">
+    <p data-t="diagText"></p>
+    <p class="note" data-t="diagPrivacy"></p>
+    <label class="check"><input id="diagRates" type="checkbox"><span><span data-t="diagRates"></span><small data-t="diagRatesNote"></small></span></label>
+    <pre id="diagLog" class="mono diaglog" hidden></pre>
+    <div id="diagResult" role="status"></div>
+  </div>
+  <div class="dfoot">
+    <button id="closeDiag" data-t="close"></button>
+    <button id="diagFolder" data-t="diagFolder" hidden></button>
+    <button id="diagMake" class="primary" data-t="diagMake"></button>
+  </div>
+</dialog>
+
+<dialog id="exportDlg" aria-labelledby="exportTitle">
+  <div class="dhead"><h2 id="exportTitle" data-t="export"></h2></div>
+  <div class="dbody"><p data-t="exportText"></p></div>
+  <div class="dfoot">
+    <button id="closeExport" data-t="close"></button>
+    <a id="exportCsv" class="primary" download><button class="primary" tabindex="-1">CSV</button></a>
+    <a id="exportJson" download><button tabindex="-1">JSON</button></a>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- texts --
+const T = {
+  bg: {
+    appName: "HF класификатор", settings: "Настройки", help: "Помощ", close: "Затвори", cancel: "Отказ", save: "Запази",
+    emissions: "Излъчвания", decodes: "Декодиран текст", decodesNote: "най-новото най-отгоре", selected: "Избрано излъчване",
+    searchLog: "Търсене в дневника", searchLogTip: "Търси в целия дневник (всички сесии) с текущите филтри", export: "Експорт",
+    searchText: "Търсене в декодирания текст…", onAirOnly: "Само в ефир", all: "Всички", unknown: "Неразпознати",
+    live: "На живо", logResults: "Резултати от дневника", backToLive: "Обратно към „На живо“",
+    colStart: "Начало (UTC)", colFreq: "Честота, kHz", colBw: "Лента, Hz", colSnr: "С/Ш, dB", colDur: "Продълж.",
+    colKind: "Вид", colText: "Текст", colRx: "Пр.",
+    shown: n => `${fmtInt(n)} ${n === 1 ? "показано" : "показани"}`,
+    noEmissions: "Още няма засечени излъчвания. Те се появяват тук веднага щом SDRconnect подава сигнал.",
+    noMatches: "Няма излъчвания, които да отговарят на филтрите.",
+    noDecodes: "Още няма декодиран текст. FT8, FT4, NAVTEX, DSC, RTTY, CW, PSK и ALE се декодират автоматично.",
+    pickEmission: "Щракнете върху излъчване в таблицата, в лентата над водопада или във водопада, за да видите подробности и да го слушате в SDRconnect.",
+    unrecognised: "неразпознато",
+    f_FSK: (sp, r) => `2-FSK, отместване ${sp} Hz${r}`, f_MFSK: (n, sp, r) => `MFSK, ${n} тона през ${sp} Hz${r}`,
+    f_multi: (n, sp, r) => `многочестотен, ${n} тона през ${sp} Hz${r}`, f_PSK: (r) => `PSK${r}`,
+    f_OOK: "OOK (манипулиран носител)", f_carrier: "носител", f_rate: (v) => `, ${v} бода`,
+    f_frame: (v) => `, рамка ${v} ms`, f_repeats: (v) => `повтаря се през ${v} ms`, frameMatch: "рамката съвпада", dModel: "Мнение на модела", modelSure: (f, c) => `прилича на ${f} (${c} %)`, modelUnsure: (f, c) => `не е сигурен (най-близо: ${f}, ${c} %)`, modelNote: "Предположение на обучен модел за вида модулация, не измерване. Под 50 % моделът не назовава вид. Той не разпознава системи или предаватели.", fam_FSK: "FSK", fam_MFSK: "MFSK", fam_PSK: "PSK", "fam_multi-carrier": "многочестотен", fam_OOK: "OOK", "fam_sweep/pulse": "свип или импулси", fam_analogue: "аналогов", listedMatch: "в списъка на тази честота", dListed: "В списъците на тази честота", listedNote: "От списъците с честоти (вградения и файловете в папка frequencies). Това е указание, не разпознаване: на една честота работят различни станции.",
+    dMeasured: "Измерено", measuredTip: "Измерено от сигнала. Не е разпознаване: много системи използват един и същ вид модулация.",
+    measuredNote: "Измерено от сигнала, не разпознаване: много системи използват един и същ вид модулация.",
+    dConsistent: "Съвместимо с", consistentNote: "Видовете от каталога с тези измерени параметри. Не е разпознаване: често няколко вида имат едни и същи параметри.",
+    prov_documented: "спецификация", prov_vendor: "Wavecom", prov_observed: "наблюдения", prov_measured: "измерено тук", prov_guess: "предположение",
+    partialMatch: "не всички параметри са потвърдени",
+    receiver: n => `Приемник ${n}`, recording: "запис", centreAt: "център", rate: "MS/s", viewOnly: "само преглед",
+    wfHint: "Щракнете върху сигнал, за да го изберете; провлачете, за да отбележите честотен прозорец",
+    legendDecoded: "декодирано", legendUnknown: "неразпознато",
+    dFreq: "Честота", dOcc: "Заета лента (99 %)", dDet: "Засечена лента", dSnr: "С/Ш средно / пиково", dDur: "Продължителност",
+    dDuty: "Запълване", dDrift: "Дрейф", dStart: "Начало", dEnd: "Край", dText: "Декодиран текст", dNoText: "Няма декодиран текст.",
+    dOnAir: "в ефир", dEnded: "приключило",
+    mode: "Демодулация", bandwidth: "Филтър, Hz", listen: "🔊 Слушай в SDRconnect", centre: "Центрирай приемника тук",
+    cannotControl: "SDRconnect не позволява управление от други програми, затова слушането и центрирането не са достъпни.",
+    playbackNoControl: "При възпроизвеждане на запис няма приемник за управление.",
+    listenNote: "Настройва демодулацията, филтъра и честотата на VFO в SDRconnect така, че сигналът да е в средата на лентата.",
+    // Connection states
+    st_connecting: "Свързване със SDRconnect…",
+    st_connected: d => `Свързан със SDRconnect${d ? " · " + d : ""}`,
+    st_view_only: d => `Свързан със SDRconnect (само преглед)${d ? " · " + d : ""}`,
+    st_no_answer: "SDRconnect не отговаря",
+    st_websocket_off: "WebSocket сървърът на SDRconnect е изключен",
+    st_not_installed: "SDRconnect не е намерен",
+    st_starting_headless: "Стартиране на SDRconnect…",
+    st_headless_failed: "SDRconnect не отговаря",
+    st_playback: "Възпроизвеждане на запис", st_demo: "Демонстрация: синтетични сигнали, без приемник", demoName: "Демонстрация", b_demo_t: "Демонстрация: всички сигнали са синтетични", b_demo: ["Програмата показва изкуствена лента в два обхвата, повтаряща се около 2 минути: на 14,080 MHz любителски видове (NAVTEX, RTTY, CW, PSK31, ALE, FT8, FT4), на 8,400 MHz DSC, SITOR-B, HFDL, радиофакс и сигнали, направени по публикуваните параметри на STANAG 4285, Akula, T-600, 16-тонален модем и MFSK.", "Щракнете върху излъчване в таблицата: декодиран текст, измерени параметри, съвместими видове от каталога, мнението на модела и записите в списъка с честоти.", "За истински приемник затворете демонстрацията и стартирайте HF Classifier (не демонстрацията)."], st_playback_done: "Записът е възпроизведен", st_playback_failed: "Записът не може да бъде отворен",
+    st_offline: "Няма връзка с програмата",
+    // Banners
+    b_no_answer_t: where => `Няма отговор от SDRconnect на ${where}`,
+    b_no_answer: ["Стартирайте SDRconnect и пуснете приемника (бутона за старт).",
+      "Включете WebSocket сървъра му в настройките на SDRconnect (Preferences, раздел WebSocket Server), порт 5454.",
+      "Програмата опитва отново на всеки няколко секунди и ще се свърже сама."],
+    b_websocket_off_t: "SDRconnect работи, но не приема връзки от други програми",
+    b_websocket_off: ["В SDRconnect отворете настройките (Preferences), раздел WebSocket Server.",
+      "Включете сървъра. Портът трябва да е 5454 (или този от Настройки тук).",
+      "Програмата ще се свърже сама до няколко секунди."],
+    b_not_installed_t: "SDRconnect не е намерен на този компютър",
+    b_not_installed: ["Изтеглете и инсталирайте SDRconnect от сайта на SDRplay: sdrplay.com/sdrconnect.",
+      "Свържете приемника (RSPduo) и стартирайте SDRconnect веднъж, за да проверите, че работи.",
+      "Включете WebSocket сървъра му в настройките (Preferences) или оставете тази програма да го стартира без прозорец."],
+    b_starting_headless_t: "SDRconnect се стартира без прозорец",
+    b_starting_headless: ["Изчакайте няколко секунди, докато SDRconnect открие приемника.",
+      "Ако предпочитате SDRconnect с прозорец, изключете тази възможност от Настройки."],
+    b_headless_failed_t: "SDRconnect без прозорец не отговаря",
+    b_headless_failed: ["Проверете дали приемникът е свързан към компютъра.",
+      "Стартирайте SDRconnect нормално и включете WebSocket сървъра му в настройките (Preferences).",
+      "Ако SDRconnect е инсталиран другаде, посочете SDRconnect_headless.exe в Настройки."],
+    st_no_iq: "Свързан, но не пристига сигнал",
+    st_measuring: "SDRconnect се измерва за диагностичния отчет…",
+    st_waiting_radio: "SDRconnect търси приемници…",
+    winTitleNew: "Нов честотен прозорец", winTitleEdit: "Честотен прозорец", winFrom: "От, kHz", winTo: "До, kHz",
+    winWhat: "Какво да се прави в него", winNone: "Без декодиране и класифициране", winRttyOther: "RTTY с друга скорост и отместване…",
+    winBaud: "Скорост, Bd", winShift: "Отместване, Hz", winLabelNone: "без обработка", winEditBtn: "Промени",
+    winNote: "Сигнал, чийто център е в прозореца, получава само този декодер (без обичайните предположения) или изобщо не се обработва. Подобхватите на FT8, FT4 и WSPR се декодират както винаги, освен ако прозорецът е „без декодиране“. Пази се в decode_windows.json в папката с базите.",
+    sWindows: "Честотни прозорци", sWindowsNone: "Още няма: провлачете по водопада, за да отбележите прозорец.",
+    mkDecoder: "Декодирай само с", mkDecoderAuto: "Както реши програмата",
+    mkDecoderNote: "Сигналите до 1,5 kHz от маркера получават само този декодер. Ако избраният сигнал е декодиран (зелено), тук е попълнен декодерът, който го е прочел.",
+    r_win: "Прозорецът е запазен.", r_winDel: "Прозорецът е изтрит.",
+    e_bad_window: "Прозорецът трябва да е от 1 kHz нагоре, по-широк от 20 Hz и по-тесен от 2 MHz.", e_unknown_decoder: "Непознат декодер.", e_no_such_window: "Няма такъв прозорец.",
+    loadChip: (b, d) => `Натоварване ${b} % · ${d} се декодират`,
+    loadTip: "Колко от реалното време обработката е заета (при 100 % изостава) и колко сигнала се декодират. Щракнете за подробности.",
+    loadTitle: "Обработка",
+    loadBusy: (b) => `Обработката е заета ${b} % от реалното време (при 100 % изостава)`,
+    loadCpu: (c) => `Всички нишки заедно: ${c} % от едно процесорно ядро`,
+    loadShowSignals: "Покажи сигналите в обработка", loadOpenSettings: "Настройки на обработката…",
+    beingProcessed: "В обработка",
+    p_trying: "пробва се", p_measuring: "измерва се", p_left_g: "оставен", p_left_i: "спрян", p_left_m: "само измерен",
+    dProc: "Обработка",
+    dProcDecoding: (d) => `Декодира се (${d})`, dProcTrying: (d) => `Пробва се с: ${d}`, dProcMeasuring: "Само се измерва: няма декодер за него",
+    dProcFor: (a, p) => `от ${a} · ${p} % от едно ядро`,
+    dProcLeft_g: "Оставен: никой декодер не даде резултат за зададеното време (Настройки → Обработка).",
+    dProcLeft_i: "Спрян от вас: не се обработва повече.", dProcLeft_m: "Измерен; няма декодер за него.",
+    dProcNone: "Не се обработва (много сигнали наведнъж, твърде слаб или извън обхвата на декодерите).",
+    stopDecoding: "Спри обработката", r_stopped: "Обработката на сигнала е спряна.",
+    sProcessing: "Обработка",
+    sProcNote: "Влизат в сила веднага щом запазите, без рестарт. Натоварването се вижда в горната лента.",
+    lagTitle: "Обработката изостава",
+    lagText: s => `Компютърът не смогва да обработи всичко, което идва от приемника: досега ${s} s сигнал са пропуснати, и декодирането страда. Намалете честотата на дискретизация в SDRconnect или броя сигнали наведнъж в Настройки → Обработка.`,
+    st_no_radio: "SDRconnect не дава приемник",
+    b_no_radio_t: "SDRconnect е свързан, но не дава приемник",
+    b_no_radio: ["SDRconnect без прозорец търси приемниците след стартиране и този път не е намерил такъв за използване (отговорът му е в съобщенията на програмата).",
+      "Проверете дали RSPduo е свързан и дали друга програма (SDRconnect с прозорец, SDRuno) не го използва.",
+      "Програмата опитва отново на всеки 10 секунди. Ако не потръгне, направете диагностичен отчет и го изпратете."],
+    diagTitle: "Диагностичен отчет", diagOpen: "Диагностичен отчет…", diagOpenNote: "Когато нещо не работи: един файл с всичко, което трябва да се изпрати.",
+    diagText: "Програмата събира в един ZIP файл: версиите на програмата, Windows и SDRconnect, настройките, състоянието на връзката, дневниците (hf_classifier.log и sdrconnect_headless.log) и измерване на това как SDRconnect подава сигнала. Изпратете файла на този, който ви помага с програмата.",
+    diagPrivacy: "Не съдържа записи, картини или дневника на приетите сигнали. Пътищата до файловете в него може да съдържат потребителското ви име в Windows.",
+    diagRates: "Измери и всяка честота на дискретизация", diagRatesNote: "Около минута; приемането спира дотогава и SDRconnect се връща към настройките си накрая.",
+    diagMake: "Направи отчета", diagFolder: "Отвори папката", diagRunning: "Отчетът се прави…",
+    diagDone: "Готово. Изтеглете отчета или го намерете в папката:", diagDownload: "Изтегли", diagFailed: e => `Отчетът не можа да бъде направен${e ? ": " + e : ""}.`,
+    e_already_running: "Вече се прави отчет.",
+    b_no_iq_t: "SDRconnect е свързан, но не изпраща сигнал (IQ)",
+    b_no_iq: ["Проверете дали приемникът е свързан и дали SDRconnect го вижда (стартирайте SDRconnect с прозорец и вижте дали показва спектър).",
+      "Ако приемникът е свързан, затворете HF класификатора, стартирайте SDRconnect с прозорец, изберете приемника и включете WebSocket сървъра (Preferences), после стартирайте класификатора отново.",
+      "Направете диагностичен отчет (бутона по-долу) и го изпратете: той съдържа дневниците и измерване на SDRconnect."],
+    b_playback_failed_t: "Записът не може да бъде отворен",
+    b_view_only_t: "SDRconnect не позволява управление",
+    b_view_only: ["Излъчванията се откриват и декодират нормално.",
+      "„Слушай“ и „Центрирай“ не са достъпни, докато SDRconnect не разреши управление от други програми."],
+    retryNow: "Опитай отново сега", openSettings: "Настройки…", openDownload: "Изтегли SDRconnect",
+    // Results
+    r_listen: (f, m) => `SDRconnect е настроен на ${f} kHz, ${m}.`,
+    r_tune: f => `Приемникът е центриран на ${f} kHz.`,
+    r_settings: "Настройките са запазени.", r_settingsRestart: "Настройките са запазени. Някои промени влизат в сила след рестарт на програмата.",
+    r_reconnect: "Ново свързване със SDRconnect…",
+    e_not_connected: "Няма връзка със SDRconnect.",
+    e_not_controllable: "Този приемник не може да се управлява.",
+    e_refused_vfo: v => `SDRconnect не прие честотата${v ? " (отчита " + v + " Hz)" : ""}.`,
+    e_refused_centre: v => `SDRconnect не прие централната честота${v ? " (отчита " + v + " Hz)" : ""}.`,
+    e_unknown_mode: "Непознат вид демодулация.", e_save_failed: "Настройките не могат да бъдат записани на диска.",
+    e_bad_port: "Портът трябва да е число от 1 до 65535.", e_bad_host: "Адресът не е правилен (пример: 127.0.0.1).",
+    e_bad_tuner: "Невалиден избор на тунер.", e_bad_serial: "Серийният номер може да съдържа само букви и цифри.",
+    e_bad_path: "Пътят е твърде дълъг.", e_bad_language: "Непознат език.", e_bad_sessions: "Невалиден брой.",
+    freqs: "Честоти", freqsTip: "Бази данни с известни честоти и търсене в тях", tasks: "Задачи за запис", tasksTip: "Какви записи са нужни и къде да се търсят сигналите",
+    dbTitle: "Бази данни с честоти",
+    dbIntro: "Станциите и системите, записани на известни честоти, се показват като маркери над водопада. Щракнете маркер, за да настроите SDRconnect на него. Записът в списък е указание, не разпознаване.",
+    dbEntries: n => `${fmtInt(n)} записа`, dbOnAir: "Само станциите, които са в ефир сега (за списъци с разписание)",
+    dbOpen: "Отвори папката с базите", dbReload: "Прочети базите отново",
+    dbAdd: "За да добавите база, сложете файла ѝ в папката и прочетете базите отново: DX етикетите на KiwiSDR (dx.json или общият списък dx_community.json от kiwisdr.com/dx/), отметки от OpenWebRX, по-ново разписание на EiBi (sked-*.csv от eibispace.de) или собствен текстов/CSV списък с по една честота на ред.",
+    dbSearch: "Търсене на станция, система или вид във всички бази…", dbNone: "Няма намерено.", dbMore: n => `и още ${fmtInt(n)}: стеснете търсенето`,
+    markOn: "в ефир сега", markOff: "не е в ефир сега (по разписание)", markHours: (a, b) => `${a}–${b} UTC`,
+    markNoControl: "Оттук SDRconnect не може да се настройва сега (само наблюдение, запис или демонстрация).",
+    dMarker: "Записана честота", picture: "приета картина",
+    tasksTitle: "Задачи за запис",
+    tasksIntro: "Програмата се учи и се проверява върху записи на истински сигнали. Всеки ред е система, от която са нужни записи, с честотите, които вашите бази дават за нея. Щракнете честота, за да настроите SDRconnect на нея, изчакайте сигналът да е в ефир и запишете.",
+    tasksHow: "Записът съдържа всичко, което SDRconnect изпраща (целия обхват на екрана), затова изберете малка честота на дискретизация в SDRconnect (62,5 до 250 kHz), за да са малки файловете. Две минути или повече; няколко дни и честоти са по-ценни от един дълъг запис.",
+    g_check: ["Декодирани видове", "Програмата ги декодира, но досега само върху синтетични сигнали и чужди аудиозаписи. Записи от вашия приемник показват дали това важи и в ефира."],
+    g_structure: ["Разпознавани по структура", "Разпознават се по синхрогрупите или кода си. Независими записи, от други дни и честоти, проверяват това честно."],
+    g_learn: ["Само класифицирани", "Програмата ги измерва и изброява с какво са съвместими. Нужни са записи, за да се научи какво отличава всяка от подобните ѝ."],
+    g_nospec: ["Без публична спецификация", "Записите са единственият източник за тях."],
+    g_planned: ["Планирани декодери", "Спецификацията е публична и е планиран декодер. Той ще се проверява върху записи от вашия приемник."],
+    g_unknown: ["Неразпознати", "Всичко силно и повтарящо се, което програмата показва в оранжево и не може да назове."],
+    taskHave: (h, w) => `${h} от ${w} записа`, taskMore: n => `+${fmtInt(n)} още`,
+    taskNoFreq: "Никоя заредена база не посочва честота за тази система. Добавете база, която я посочва („Честоти“), или я запишете, когато я откриете.",
+    recBtn: m => `Запис ${m} мин`, recStop: "Спри", recOpen: "Отвори папката със записите",
+    recState: (a, b, task) => `Запис ${a} / ${b} · ${task}`,
+    recOff: "Записът е изключен в демонстрацията: запис на синтетичен сигнал би се броил за истински.",
+    recordThis: (m, task) => `Запиши ${m} мин (задача: ${task})`,
+    rec_done: f => `Записът е готов: ${f}`, rec_stopped: f => `Записът е спрян: ${f}`,
+    rec_rate_changed: "Записът спря: честотата на дискретизация се промени.", rec_cannot_write: "Записът не можа да бъде записан на диска.",
+    r_record: "Записът започна.", r_reload: "Базите са прочетени отново.",
+    e_bad_give_up: "Невалиден брой секунди.", e_bad_snr: "Невалидна стойност в dB.", e_bad_sessions: "Броят сигнали трябва да е от 1 до 500.",
+    e_already_recording: "Вече тече запис.", e_no_signal: "Още не пристига сигнал от приемника.", e_not_available: "Тук това не е достъпно.", e_no_receiver: "Няма такъв приемник.",
+    resIntro: "Колко процесорно време отива за всяка дейност (в % от едно ядро на процесора) и какво прави програмата с всеки сигнал в момента. Настройките долу важат веднага и се запазват.",
+    resNone: "Още няма данни: появяват се на всеки 2 секунди, докато пристига сигнал.",
+    resLoad: (cpu, load) => `Обработка: ${cpu} % от едно ядро · ${load} % от реалното време (над 100 % програмата изостава)`,
+    resActivities: "Дейности", resSessions: "Сигнали, които се обработват",
+    resCounts: (d, t, m) => `${d} се декодират · ${t} се пробват · ${m} само се измерват`,
+    resLeft: (g, i, m) => `Оставени досега: ${g} без резултат след зададеното време, ${i} спрени от вас, ${m} измерени, без декодер за тях`,
+    st_decoding: "декодира се", st_trying: "пробва се", st_measuring: "измерва се",
+    colState: "Състояние", colDecoders: "Декодери", colAge: "От", colCpu: "Процесор",
+    resStop: "Спри", resStopTip: "Спри обработката на този сигнал и не я започвай отново",
+    resControls: "Какво да прави програмата",
+    resMax: "Най-много сигнали наведнъж", resGiveUp: "Остави сигнал без резултат след (секунди, 0 = никога)",
+    resMinSnr: "Не обработвай сигнали, по-слаби от (dB)", resUnknown: "Измервай и класифицирай сигнали, за които няма декодер",
+    resUnknownTip: "Изключено: процесорът отива само за сигнали, които програмата може да декодира",
+    resDecoders: "Декодери (махнете отметката, за да изключите)", r_res: "Настройката е приложена.",
+    act: { "spectrum and detector": "Спектър, откриване на сигнали, изрязване на канали", "channels of signals": "Аудио на сигналите",
+      "measuring signals": "Измерване на сигнали", "measuring signals no decoder fits": "Измерване на сигнали без декодер",
+      "FT8/FT4 sub-bands": "FT8/FT4 подобхвати", "WSPR sub-bands": "WSPR подобхвати", "HFDL channels": "HFDL канали" },
+    actDecoder: (n) => `Декодер ${n}`,
+    dlTitle: "Изтегляне на списъци", dlBtn: "Изтегли списъците на KiwiSDR и EiBi",
+    dlText: "Вашият компютър изтегля от интернет общия списък с етикети на KiwiSDR (kiwisdr.com, където са и военните и служебните маркери от сайтовете с KiwiSDR) с категориите му, и текущото разписание на EiBi (eibispace.de) в папката с базите. Нищо не идва с програмата: списъците се теглят от вас, за ваша употреба.",
+    dlRunning: "Изтегляне…", dlOk: (n, e) => `${n}: изтеглен${e ? ", " + fmtInt(e) + " записа" : ""}`, dlBad: (n, why) => `${n}: не е изтеглен (${why})`,
+    dlWhy: { https_not_supported: "сайтът иска https: изтеглете го ръчно", not_a_list: "отговорът не е списък", cannot_write: "не може да се запише" },
+    myTitle: "Моите маркери", myNone: "Още няма. Изберете сигнал или щракнете водопада и натиснете „Запази като мой маркер“.",
+    myAdd: "Добави маркер", myEdit: "Промени", mySave: "Запази като мой маркер", myEditThis: "Промени моя маркер",
+    mkNew: "Нов маркер", mkEdit: "Моят маркер", mkFreq: "Честота, kHz", mkLabel: "Етикет (станция, система, вид)", mkNote: "Бележка",
+    mkHint: "Етикет като „STANAG 4285“ или „RTTY 50/450“ насочва и декодерите и „Съвместимо с“, както записите в другите списъци.",
+    mkDelete: "Изтрий", r_marker: "Маркерът е запазен.", r_markerDel: "Маркерът е изтрит.",
+    e_bad_frequency: "Невалидна честота.", e_no_label: "Въведете етикет.", e_too_long: "Текстът е твърде дълъг.", e_no_such_marker: "Няма такъв маркер.",
+    e_already_downloading: "Вече се изтегля.", e_cannot_write: "Файлът не може да бъде записан.",
+    catTitle: "Категории (от списъка на KiwiSDR)", catNone: "Изтеглете списъците на KiwiSDR, за да има категории.",
+    dSame: "На тази честота според списъците", dSameMore: (n) => `и още ${fmtInt(n)}`,
+    e_generic: "Действието не беше изпълнено.",
+    // Settings dialog
+    sLanguage: "Език", sLangAuto: "Автоматично (според Windows)",
+    sHost: "Адрес на SDRconnect", sHostNote: "127.0.0.1 е този компютър.", sPort: "Порт", sPortNote: "На WebSocket сървъра, обикновено 5454.",
+    sTuner: "Тунер на приемника", sTuner1: "Тунер 1", sTuner2: "Тунер 2", sTunerBoth: "И двата тунера (RSPduo в режим с два тунера)",
+    sSerial: "Сериен номер на RSPduo", sSerialNote: "Само за режим с два тунера: програмата превключва RSPduo в този режим. Оставете празно, ако вече е включен.",
+    sHeadless: "Стартирай SDRconnect без прозорец, когато не работи",
+    sHeadlessNote: "Ако SDRconnect не е стартиран, програмата пуска SDRconnect_headless и го спира при изход.",
+    sHeadlessPath: "SDRconnect_headless.exe", sHeadlessPathAuto: "Търси автоматично",
+    sProgram: "Програма", sOpenWindow: "Отваряй прозореца при стартиране", sOpenWindowNote: "Иначе програмата работи в областта за уведомяване (до часовника).",
+    sFt8: "Декодирай FT8 и FT4", sHttpPort: "Порт на прозореца на програмата", sAfterRestart: "Влиза в сила след рестарт на програмата.",
+    sDataFolder: "Дневникът и настройките се пазят в:",
+    exportText: "Излъчванията и техният текст с текущите филтри (честота, вид, текст), като таблица (CSV, за Excel) или като JSON.",
+    // Units
+    unitS: "с", unitMin: "мин", unitH: "ч", hzPerS: "Hz/s",
+    helpHtml: `
+      <h3>Какво прави програмата</h3>
+      <p>Следи всичко, което приема SDRconnect, открива всяко излъчване в честотната лента и декодира видовете, които познава: FT8, FT4, NAVTEX/SITOR-B, RTTY, CW (морз), PSK31 до PSK500 (BPSK и QPSK) и ALE. Останалите излъчвания се показват с измерените честота, лента, сигнал/шум и продължителност. Всичко се записва в дневник.</p>
+      <h3>Как да започна</h3>
+      <ul><li>Стартирайте SDRconnect, пуснете приемника и включете WebSocket сървъра в настройките му (Preferences, раздел WebSocket Server).</li>
+      <li>Тази програма се свързва сама. Ако SDRconnect не работи, тя може да го стартира без прозорец (Настройки).</li>
+      <li>Щракнете върху излъчване, за да видите подробностите и да го чуете в SDRconnect.</li></ul>
+      <h3>Цветове</h3>
+      <ul><li><span class="swatch dec"></span> Зелено — декодирано: декодер е разпознал вида и е получил текст. FT8, FT4, NAVTEX и ALE имат и проверка за грешки; при CW, RTTY и PSK текстът може да съдържа грешки.</li>
+      <li><span class="swatch und"></span> Оранжево — неразпознато: излъчването е засечено и измерено, но не е декодирано. За него таблицата показва измереното от сигнала („≈ 2-FSK, отместване 850 Hz, 75 бода“): вид модулация, брой тонове и разстояние между тях, скорост и, ако сигналът се повтаря, периодът му (рамката на модема). Това не е разпознаване — много системи използват един и същ вид модулация. В подробностите са изброени видовете от каталога, съвместими с измереното (с източника на параметрите им).</li>
+      <li>Водопадът: по-светлото е по-силно; най-новото е най-отгоре.</li>
+      <li>Списъци с честоти: сложете файлове с известни честоти (текст, CSV, dx.json от KiwiSDR, отметки от OpenWebRX) в подпапка frequencies на папката с данни и рестартирайте. Излъчванията на такава честота показват записаното за нея; то е указание, не разпознаване.</li></ul>
+      <h3>Дневник и експорт</h3>
+      <p>„Търсене в дневника“ търси във всички записани сесии. „Експорт“ дава таблица за Excel (CSV) или JSON.</p>
+      <h3>Важно</h3>
+      <p>Програмата само приема. Не предава, не дешифрира и не декодира криптирани съобщения. Спазвайте законите на своята страна за радиоприемане.</p>`,
+  },
+  en: {
+    appName: "HF Classifier", settings: "Settings", help: "Help", close: "Close", cancel: "Cancel", save: "Save",
+    emissions: "Emissions", decodes: "Decoded text", decodesNote: "newest first", selected: "Selected emission",
+    searchLog: "Search the log", searchLogTip: "Search the whole log (every session) with the current filters", export: "Export",
+    searchText: "Search the decoded text…", onAirOnly: "On air only", all: "All", unknown: "Unrecognised",
+    live: "Live", logResults: "Log results", backToLive: "Back to live",
+    colStart: "Start (UTC)", colFreq: "Frequency, kHz", colBw: "Band, Hz", colSnr: "SNR, dB", colDur: "Duration",
+    colKind: "Kind", colText: "Text", colRx: "Rx",
+    shown: n => `${fmtInt(n)} shown`,
+    noEmissions: "No emissions found yet. They appear here as soon as SDRconnect delivers a signal.",
+    noMatches: "No emissions match the filters.",
+    noDecodes: "No decoded text yet. FT8, FT4, NAVTEX, DSC, RTTY, CW, PSK and ALE are decoded automatically.",
+    pickEmission: "Click an emission in the table, in the strip above the waterfall or in the waterfall to see its details and listen to it in SDRconnect.",
+    unrecognised: "unrecognised",
+    f_FSK: (sp, r) => `2-FSK, shift ${sp} Hz${r}`, f_MFSK: (n, sp, r) => `MFSK, ${n} tones ${sp} Hz apart${r}`,
+    f_multi: (n, sp, r) => `multi-carrier, ${n} tones ${sp} Hz apart${r}`, f_PSK: (r) => `PSK${r}`,
+    f_OOK: "OOK (keyed carrier)", f_carrier: "carrier", f_rate: (v) => `, ${v} Bd`,
+    f_frame: (v) => `, frame ${v} ms`, f_repeats: (v) => `repeats every ${v} ms`, frameMatch: "frame matches", dModel: "Model's opinion", modelSure: (f, c) => `looks like ${f} (${c} %)`, modelUnsure: (f, c) => `not sure (closest: ${f}, ${c} %)`, modelNote: "A trained model's prediction of the modulation family, not a measurement. Under 50 % the model names no family. It does not identify systems or transmitters.", fam_FSK: "FSK", fam_MFSK: "MFSK", fam_PSK: "PSK", "fam_multi-carrier": "multi-carrier", fam_OOK: "OOK", "fam_sweep/pulse": "sweep or pulses", fam_analogue: "analogue", listedMatch: "listed on this frequency", dListed: "Listed on this frequency", listedNote: "From the frequency lists (the built-in one and the files in the frequencies folder). A hint, not an identification: different stations use the same frequency.",
+    dMeasured: "Measured", measuredTip: "Measured from the signal. Not an identification: many systems use the same kind of modulation.",
+    measuredNote: "Measured from the signal, not an identification: many systems use the same kind of modulation.",
+    dConsistent: "Consistent with", consistentNote: "Catalogue modes with these measured parameters. Not an identification: several modes often share them.",
+    prov_documented: "specification", prov_vendor: "Wavecom", prov_observed: "observations", prov_measured: "measured here", prov_guess: "guess",
+    partialMatch: "not all its parameters confirmed",
+    receiver: n => `Receiver ${n}`, recording: "recording", centreAt: "centre", rate: "MS/s", viewOnly: "view only",
+    wfHint: "Click a signal to select it; drag to mark a frequency window",
+    legendDecoded: "decoded", legendUnknown: "unrecognised",
+    dFreq: "Frequency", dOcc: "Occupied band (99 %)", dDet: "Detected band", dSnr: "SNR mean / peak", dDur: "Duration",
+    dDuty: "Duty", dDrift: "Drift", dStart: "Start", dEnd: "End", dText: "Decoded text", dNoText: "No decoded text.",
+    dOnAir: "on air", dEnded: "ended",
+    mode: "Demodulation", bandwidth: "Filter, Hz", listen: "🔊 Listen in SDRconnect", centre: "Centre the receiver here",
+    cannotControl: "SDRconnect does not allow control by other programs, so listening and centring are not available.",
+    playbackNoControl: "There is no receiver to control while playing a recording.",
+    listenNote: "Sets SDRconnect's demodulation, filter and VFO so that the signal sits in the middle of the passband.",
+    st_connecting: "Connecting to SDRconnect…",
+    st_connected: d => `Connected to SDRconnect${d ? " · " + d : ""}`,
+    st_view_only: d => `Connected to SDRconnect (view only)${d ? " · " + d : ""}`,
+    st_no_answer: "SDRconnect does not answer",
+    st_websocket_off: "SDRconnect's WebSocket server is off",
+    st_not_installed: "SDRconnect not found",
+    st_starting_headless: "Starting SDRconnect…",
+    st_headless_failed: "SDRconnect does not answer",
+    st_playback: "Playing a recording", st_demo: "Demo: synthetic signals, no receiver", demoName: "Demo", b_demo_t: "Demo: every signal is synthetic", b_demo: ["The program is showing a made-up band in two parts, repeating every 2 minutes or so: at 14.080 MHz amateur modes (NAVTEX, RTTY, CW, PSK31, ALE, FT8, FT4), at 8.400 MHz DSC, SITOR-B, HFDL, a radiofax chart and signals built from the published parameters of STANAG 4285, Akula, T-600, a 16-tone modem and MFSK.", "Click an emission in the table: decoded text, measured parameters, the catalogue modes it is consistent with, the model\u2019s opinion and frequency-list entries.", "For a real receiver, close the demo and start HF Classifier (not the demo)."], st_playback_done: "Recording played", st_playback_failed: "The recording cannot be opened",
+    st_offline: "No connection to the program",
+    b_no_answer_t: where => `No answer from SDRconnect at ${where}`,
+    b_no_answer: ["Start SDRconnect and start the receiver (its play button).",
+      "Switch on its WebSocket server in SDRconnect's settings (Preferences, WebSocket Server section), port 5454.",
+      "This program tries again every few seconds and connects by itself."],
+    b_websocket_off_t: "SDRconnect is running but does not accept connections from other programs",
+    b_websocket_off: ["In SDRconnect, open the settings (Preferences), WebSocket Server section.",
+      "Switch the server on. The port must be 5454 (or the one in Settings here).",
+      "This program connects by itself within a few seconds."],
+    b_not_installed_t: "SDRconnect was not found on this computer",
+    b_not_installed: ["Download and install SDRconnect from SDRplay's site: sdrplay.com/sdrconnect.",
+      "Connect the receiver (RSPduo) and start SDRconnect once to check that it works.",
+      "Switch on its WebSocket server in its settings (Preferences), or let this program start it without a window."],
+    b_starting_headless_t: "SDRconnect is starting without a window",
+    b_starting_headless: ["Wait a few seconds while SDRconnect finds the receiver.",
+      "If you prefer SDRconnect with its window, switch this off in Settings."],
+    b_headless_failed_t: "SDRconnect without a window does not answer",
+    b_headless_failed: ["Check that the receiver is connected to the computer.",
+      "Start SDRconnect normally and switch on its WebSocket server in its settings (Preferences).",
+      "If SDRconnect is installed elsewhere, choose SDRconnect_headless.exe in Settings."],
+    st_no_iq: "Connected, but no signal arrives",
+    st_measuring: "Measuring SDRconnect for the diagnostic report…",
+    st_waiting_radio: "SDRconnect is looking for receivers…",
+    winTitleNew: "New frequency window", winTitleEdit: "Frequency window", winFrom: "From, kHz", winTo: "To, kHz",
+    winWhat: "What to do in it", winNone: "Do not decode or classify", winRttyOther: "RTTY at another rate and shift…",
+    winBaud: "Rate, Bd", winShift: "Shift, Hz", winLabelNone: "no processing", winEditBtn: "Edit",
+    winNote: "A signal whose centre is in the window gets only this decoder (without the usual guesses), or no processing at all. The FT8, FT4 and WSPR sub-bands are decoded as always unless the window says no processing. Kept in decode_windows.json in the databases folder.",
+    sWindows: "Frequency windows", sWindowsNone: "None yet: drag across the waterfall to mark one.",
+    mkDecoder: "Decode only with", mkDecoderAuto: "As the program decides",
+    mkDecoderNote: "Signals within 1.5 kHz of the marker get only this decoder. When the selected signal was decoded (green), the decoder that read it is filled in here.",
+    r_win: "The window is saved.", r_winDel: "The window is deleted.",
+    e_bad_window: "The window must start at 1 kHz or above, be wider than 20 Hz and narrower than 2 MHz.", e_unknown_decoder: "Unknown decoder.", e_no_such_window: "No such window.",
+    loadChip: (b, d) => `Load ${b} % · ${d} decoding`,
+    loadTip: "How much of real time the processing is busy (at 100 % it falls behind) and how many signals are being decoded. Click for details.",
+    loadTitle: "Processing",
+    loadBusy: (b) => `The processing is busy ${b} % of real time (at 100 % it falls behind)`,
+    loadCpu: (c) => `All threads together: ${c} % of one processor core`,
+    loadShowSignals: "Show the signals being processed", loadOpenSettings: "Processing settings…",
+    beingProcessed: "Being processed",
+    p_trying: "being tried", p_measuring: "measuring", p_left_g: "given up", p_left_i: "stopped", p_left_m: "measured only",
+    dProc: "Processing",
+    dProcDecoding: (d) => `Decoding (${d})`, dProcTrying: (d) => `Being tried with: ${d}`, dProcMeasuring: "Only measured: no decoder fits it",
+    dProcFor: (a, p) => `for ${a} · ${p} % of one core`,
+    dProcLeft_g: "Given up: no decoder gave a result within the set time (Settings → Processing).",
+    dProcLeft_i: "Stopped by you: no longer processed.", dProcLeft_m: "Measured; no decoder fits it.",
+    dProcNone: "Not processed (too many signals at once, too weak, or outside every decoder's range).",
+    stopDecoding: "Stop processing it", r_stopped: "Processing of the signal stopped.",
+    sProcessing: "Processing",
+    sProcNote: "These take effect as soon as you save, without a restart. The load shows in the top bar.",
+    lagTitle: "The processing is falling behind",
+    lagText: s => `This computer does not keep up with everything the receiver sends: ${s} s of signal have been dropped so far, and decoding suffers. Lower the sample rate in SDRconnect, or the number of signals at once in Settings → Processing.`,
+    st_no_radio: "SDRconnect offers no receiver",
+    b_no_radio_t: "SDRconnect is connected but offers no receiver",
+    b_no_radio: ["SDRconnect without a window looks for receivers when it starts, and this time found none to use (what it answered is in the program's messages).",
+      "Check that the RSPduo is connected and that no other program (SDRconnect with its window, SDRuno) is using it.",
+      "The program tries again every 10 seconds. If that does not help, make a diagnostic report and send it."],
+    diagTitle: "Diagnostic report", diagOpen: "Diagnostic report…", diagOpenNote: "When something does not work: one file with everything to send.",
+    diagText: "The program collects into one ZIP file: the versions of the program, Windows and SDRconnect, the settings, the state of the connection, the logs (hf_classifier.log and sdrconnect_headless.log), and a measurement of how SDRconnect delivers the signal. Send the file to whoever helps you with the program.",
+    diagPrivacy: "It contains no recordings, pictures or log of received signals. The file paths in it can contain your Windows user name.",
+    diagRates: "Also measure each sample rate", diagRatesNote: "About a minute; reception pauses meanwhile, and SDRconnect gets its settings back at the end.",
+    diagMake: "Make the report", diagFolder: "Open the folder", diagRunning: "Making the report…",
+    diagDone: "Done. Download the report, or find it in the folder:", diagDownload: "Download", diagFailed: e => `The report could not be made${e ? ": " + e : ""}.`,
+    e_already_running: "A report is already being made.",
+    b_no_iq_t: "SDRconnect is connected but sends no signal (IQ)",
+    b_no_iq: ["Check that the receiver is connected and that SDRconnect sees it (start SDRconnect with its window and see whether it shows a spectrum).",
+      "If the receiver is connected, close HF Classifier, start SDRconnect with its window, select the receiver and switch on its WebSocket server (Preferences), then start the classifier again.",
+      "Make a diagnostic report (the button below) and send it: it contains the logs and a measurement of SDRconnect."],
+    b_playback_failed_t: "The recording cannot be opened",
+    b_view_only_t: "SDRconnect does not allow control",
+    b_view_only: ["Emissions are found and decoded as usual.",
+      "Listen and Centre are not available until SDRconnect allows control by other programs."],
+    retryNow: "Try again now", openSettings: "Settings…", openDownload: "Download SDRconnect",
+    r_listen: (f, m) => `SDRconnect is tuned to ${f} kHz, ${m}.`,
+    r_tune: f => `The receiver is centred on ${f} kHz.`,
+    r_settings: "Settings saved.", r_settingsRestart: "Settings saved. Some changes take effect when the program is restarted.",
+    r_reconnect: "Connecting to SDRconnect again…",
+    e_not_connected: "Not connected to SDRconnect.",
+    e_not_controllable: "This receiver cannot be controlled.",
+    e_refused_vfo: v => `SDRconnect did not accept the frequency${v ? " (it reports " + v + " Hz)" : ""}.`,
+    e_refused_centre: v => `SDRconnect did not accept the centre frequency${v ? " (it reports " + v + " Hz)" : ""}.`,
+    e_unknown_mode: "Unknown demodulation.", e_save_failed: "The settings cannot be written to disk.",
+    e_bad_port: "The port must be a number from 1 to 65535.", e_bad_host: "The address is not valid (example: 127.0.0.1).",
+    e_bad_tuner: "Invalid tuner choice.", e_bad_serial: "The serial number may only contain letters and digits.",
+    e_bad_path: "The path is too long.", e_bad_language: "Unknown language.", e_bad_sessions: "Invalid number.",
+    freqs: "Frequencies", freqsTip: "Databases of known frequencies, and a search in them", tasks: "Recording tasks", tasksTip: "Which recordings are wanted and where to look for the signals",
+    dbTitle: "Frequency databases",
+    dbIntro: "Stations and systems listed on known frequencies show as markers above the waterfall. Click a marker to set SDRconnect to it. A listing is a hint, never an identification.",
+    dbEntries: n => `${fmtInt(n)} entries`, dbOnAir: "Only stations on the air now (for lists with a schedule)",
+    dbOpen: "Open the databases folder", dbReload: "Read the databases again",
+    dbAdd: "To add a database, put its file into the folder and read the databases again: a KiwiSDR's DX labels (dx.json, or the community list dx_community.json from kiwisdr.com/dx/), OpenWebRX bookmarks, a newer EiBi schedule (sked-*.csv from eibispace.de), or your own text or CSV list with one frequency per line.",
+    dbSearch: "Find a station, system or mode in all databases…", dbNone: "Nothing found.", dbMore: n => `and ${fmtInt(n)} more: narrow the search`,
+    markOn: "on the air now", markOff: "not on the air now (by its schedule)", markHours: (a, b) => `${a}–${b} UTC`,
+    markNoControl: "SDRconnect cannot be set from here now (view only, a recording or the demo).",
+    dMarker: "Listed frequency", picture: "received picture",
+    tasksTitle: "Recording tasks",
+    tasksIntro: "The program learns from recordings of real signals and is tested on them. Each line is a system of which recordings are wanted, with the frequencies your databases list for it. Click a frequency to set SDRconnect to it, wait until the signal is on the air, then record.",
+    tasksHow: "A recording holds everything SDRconnect is sending (the whole band on the screen), so choose a small sample rate in SDRconnect (62.5 to 250 kHz) to keep the files small. Two minutes or more; several days and frequencies are worth more than one long recording.",
+    g_check: ["Decoded modes", "The program decodes these, but so far only on synthetic signals and other people's audio. Recordings from your receiver show whether that holds on the air."],
+    g_structure: ["Recognised by structure", "Recognised by their sync groups or their code. Independent recordings, from other days and frequencies, test that honestly."],
+    g_learn: ["Classified only", "The program measures these and lists what they are consistent with. Recordings are needed to learn what tells each from its look-alikes."],
+    g_nospec: ["No public specification", "Recordings are the only source for these."],
+    g_planned: ["Decoders planned", "The specification is public and a decoder is planned. It will be tested on recordings from your receiver."],
+    g_unknown: ["Unidentified", "Anything strong and repeating that the program shows in orange and cannot name."],
+    taskHave: (h, w) => `${h} of ${w} recordings`, taskMore: n => `+${fmtInt(n)} more`,
+    taskNoFreq: "No loaded database names a frequency for this system. Add a database that does (Frequencies), or record it when you find it.",
+    recBtn: m => `Record ${m} min`, recStop: "Stop", recOpen: "Open the recordings folder",
+    recState: (a, b, task) => `Recording ${a} / ${b} · ${task}`,
+    recOff: "Recording is off in the demo: a recording of a synthetic signal would count as a real one.",
+    recordThis: (m, task) => `Record ${m} min (task: ${task})`,
+    rec_done: f => `Recording saved: ${f}`, rec_stopped: f => `Recording stopped: ${f}`,
+    rec_rate_changed: "The recording stopped: the sample rate changed.", rec_cannot_write: "The recording could not be written to disk.",
+    r_record: "Recording started.", r_reload: "The databases were read again.",
+    e_bad_give_up: "Not a valid number of seconds.", e_bad_snr: "Not a valid value in dB.", e_bad_sessions: "The number of signals must be 1 to 500.",
+    e_already_recording: "A recording is already running.", e_no_signal: "No signal is arriving from the receiver yet.", e_not_available: "Not available here.", e_no_receiver: "No such receiver.",
+    resIntro: "How much processor time each activity takes (in % of one processor core) and what the program is doing with each signal now. The settings below apply at once and are saved.",
+    resNone: "No data yet: it comes every 2 seconds while a signal arrives.",
+    resLoad: (cpu, load) => `Processing: ${cpu} % of one core · ${load} % of real time (above 100 % the program falls behind)`,
+    resActivities: "Activities", resSessions: "Signals being processed",
+    resCounts: (d, t, m) => `${d} decoding · ${t} being tried · ${m} only measured`,
+    resLeft: (g, i, m) => `Left so far: ${g} with no result after the set time, ${i} stopped by you, ${m} measured, no decoder for them`,
+    st_decoding: "decoding", st_trying: "trying", st_measuring: "measuring",
+    colState: "State", colDecoders: "Decoders", colAge: "For", colCpu: "Processor",
+    resStop: "Stop", resStopTip: "Stop processing this signal and do not start again",
+    resControls: "What the program should do",
+    resMax: "At most this many signals at once", resGiveUp: "Leave a signal with no result after (seconds, 0 = never)",
+    resMinSnr: "Do not process signals weaker than (dB)", resUnknown: "Measure and classify signals no decoder fits",
+    resUnknownTip: "Off: the processor goes only to signals the program can decode",
+    resDecoders: "Decoders (untick to switch one off)", r_res: "The setting is applied.",
+    act: { "spectrum and detector": "Spectrum, finding signals, cutting out channels", "channels of signals": "Signals' audio",
+      "measuring signals": "Measuring signals", "measuring signals no decoder fits": "Measuring signals no decoder fits",
+      "FT8/FT4 sub-bands": "FT8/FT4 sub-bands", "WSPR sub-bands": "WSPR sub-bands", "HFDL channels": "HFDL channels" },
+    actDecoder: (n) => `Decoder ${n}`,
+    dlTitle: "Download lists", dlBtn: "Download the KiwiSDR and EiBi lists",
+    dlText: "Your computer downloads from the internet KiwiSDR's community label list (kiwisdr.com, where the military and utility markers of KiwiSDR sites come from) with its categories, and EiBi's current schedule (eibispace.de), into the databases folder. Nothing comes with the program: you download the lists, for your own use.",
+    dlRunning: "Downloading…", dlOk: (n, e) => `${n}: downloaded${e ? ", " + fmtInt(e) + " entries" : ""}`, dlBad: (n, why) => `${n}: not downloaded (${why})`,
+    dlWhy: { https_not_supported: "the site wants https: download it by hand", not_a_list: "the answer is not a list", cannot_write: "cannot be written" },
+    myTitle: "My markers", myNone: "None yet. Select a signal or click the waterfall and press \"Save as my marker\".",
+    myAdd: "Add a marker", myEdit: "Edit", mySave: "Save as my marker", myEditThis: "Edit my marker",
+    mkNew: "New marker", mkEdit: "My marker", mkFreq: "Frequency, kHz", mkLabel: "Label (station, system, mode)", mkNote: "Note",
+    mkHint: "A label like \"STANAG 4285\" or \"RTTY 50/450\" guides the decoders and \"Consistent with\", as entries of the other lists do.",
+    mkDelete: "Delete", r_marker: "The marker is saved.", r_markerDel: "The marker is deleted.",
+    e_bad_frequency: "Not a valid frequency.", e_no_label: "Enter a label.", e_too_long: "The text is too long.", e_no_such_marker: "No such marker.",
+    e_already_downloading: "Already downloading.", e_cannot_write: "The file cannot be written.",
+    catTitle: "Categories (from KiwiSDR's list)", catNone: "Download the KiwiSDR lists to have categories.",
+    dSame: "On this frequency, by the lists", dSameMore: (n) => `and ${fmtInt(n)} more`,
+    e_generic: "The action was not carried out.",
+    sLanguage: "Language", sLangAuto: "Automatic (as Windows)",
+    sHost: "SDRconnect address", sHostNote: "127.0.0.1 is this computer.", sPort: "Port", sPortNote: "Of its WebSocket server, usually 5454.",
+    sTuner: "Receiver tuner", sTuner1: "Tuner 1", sTuner2: "Tuner 2", sTunerBoth: "Both tuners (RSPduo in dual tuner mode)",
+    sSerial: "RSPduo serial number", sSerialNote: "For dual tuner mode only: the program switches the RSPduo into it. Leave empty if it already is.",
+    sHeadless: "Start SDRconnect without a window when it is not running",
+    sHeadlessNote: "If SDRconnect is not running, the program starts SDRconnect_headless and stops it on exit.",
+    sHeadlessPath: "SDRconnect_headless.exe", sHeadlessPathAuto: "Find automatically",
+    sProgram: "Program", sOpenWindow: "Open the window at start", sOpenWindowNote: "Otherwise the program runs in the notification area (by the clock).",
+    sFt8: "Decode FT8 and FT4", sHttpPort: "Port of the program's window", sAfterRestart: "Takes effect when the program is restarted.",
+    sDataFolder: "The log and settings are kept in:",
+    exportText: "The emissions and their text, with the current filters (frequency, kind, text), as a table (CSV, for Excel) or as JSON.",
+    unitS: "s", unitMin: "min", unitH: "h", hzPerS: "Hz/s",
+    helpHtml: `
+      <h3>What the program does</h3>
+      <p>It watches everything SDRconnect receives, finds every emission in the band, and decodes the kinds it knows: FT8, FT4, NAVTEX/SITOR-B, RTTY, CW (Morse), PSK31 to PSK500 (BPSK and QPSK) and ALE. Other emissions are shown with their measured frequency, band, signal-to-noise ratio and duration. Everything goes into a log.</p>
+      <h3>Getting started</h3>
+      <ul><li>Start SDRconnect, start the receiver and switch on its WebSocket server in its settings (Preferences, WebSocket Server section).</li>
+      <li>This program connects by itself. If SDRconnect is not running, it can start it without a window (Settings).</li>
+      <li>Click an emission to see its details and hear it in SDRconnect.</li></ul>
+      <h3>Colours</h3>
+      <ul><li><span class="swatch dec"></span> Green: decoded, a decoder recognised the mode and got text. FT8, FT4, NAVTEX and ALE also check for errors; CW, RTTY and PSK text can contain errors.</li>
+      <li><span class="swatch und"></span> Orange: unrecognised, the emission was detected and measured but not decoded. For these the table shows what was measured from the signal ("≈ 2-FSK, shift 850 Hz, 75 Bd"): the kind of modulation, the number of tones and their spacing, the symbol rate and, when the signal repeats itself, its period (a modem's frame). That is not an identification: many systems use the same kind of modulation. The details list the catalogue modes consistent with what was measured (with where their parameters come from).</li>
+      <li>Waterfall: brighter is stronger; the newest is at the top.</li>
+      <li>Frequency lists: put files of known frequencies (text, CSV, a KiwiSDR's dx.json, OpenWebRX bookmarks) into the frequencies folder inside the data folder and restart. Emissions on such a frequency show what is listed there; a hint, not an identification.</li></ul>
+      <h3>Log and export</h3>
+      <p>"Search the log" searches every recorded session. "Export" gives a table for Excel (CSV) or JSON.</p>
+      <h3>Important</h3>
+      <p>The program only receives. It does not transmit, decrypt or decode encrypted messages. Follow your country's laws on radio reception.</p>`,
+  },
+};
+
+let lang = "bg";
+const L = () => T[lang];
+const t = (k, ...a) => { const v = L()[k] ?? T.en[k] ?? k; return typeof v === "function" ? v(...a) : v; };
+const locale = () => (lang === "bg" ? "bg-BG" : "en-GB");
+const fmtInt = (n) => new Intl.NumberFormat(locale()).format(Math.round(n));
+const fmtNum = (n, d) => new Intl.NumberFormat(locale(), { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
+const fmtKhz = (hz) => fmtNum(hz / 1000, 3);
+const fmtTime = (s) => (s ? new Date(s * 1000).toISOString().slice(11, 19) : "");
+const fmtDateTime = (s) => (s ? new Date(s * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "");
+function fmtDur(sec) {
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return `${sec} ${t("unitS")}`;
+  if (sec < 3600) return `${Math.floor(sec / 60)} ${t("unitMin")} ${sec % 60} ${t("unitS")}`;
+  return `${Math.floor(sec / 3600)} ${t("unitH")} ${Math.floor((sec % 3600) / 60)} ${t("unitMin")}`;
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $ = (id) => document.getElementById(id);
+
+function applyTexts() {
+  document.documentElement.lang = lang;
+  document.title = t("appName");
+  document.querySelectorAll("[data-t]").forEach((el) => (el.textContent = t(el.dataset.t)));
+  document.querySelectorAll("[data-t-placeholder]").forEach((el) => (el.placeholder = t(el.dataset.tPlaceholder)));
+  document.querySelectorAll("[data-t-title]").forEach((el) => (el.title = t(el.dataset.tTitle)));
+  $("lang").value = lang;
+  $("helpBody").innerHTML = t("helpHtml");
+  $("emEmpty").textContent = t("noEmissions");
+  $("logEmpty").textContent = t("noDecodes");
+  renderHead();
+  renderStatus();
+  Object.values(state.receivers).forEach((r) => { renderRxTitle(r); drawAxis(r); drawLane(r); drawMarks(r); renderRec(r); });
+  if ($("dbDlg").open) renderDb();
+  if ($("tasksDlg").open) renderTasks();
+  renderLoad();
+  if ($("diagDlg").open) renderDiag();
+  renderChips();
+  renderTable();
+  renderDetails();
+  rerenderLog();
+}
+
+// ---------------------------------------------------------------- state --
+const state = { receivers: {}, emissions: new Map(), texts: new Map(), seenDecodes: new Set(), decodes: [], labels: new Set(),
+  selectedKey: null, selectedFree: null, filterLabel: "", mode: "live", searchRows: [], status: null, settings: null };
+const key = (rx, id) => rx + ":" + id;
+
+function setLanguage(l, save) {
+  lang = l === "en" ? "en" : "bg";
+  try { localStorage.setItem("hfc.lang", lang); } catch (e) { /* private window */ }
+  applyTexts();
+  if (save) send({ cmd: "settings", language: lang });
+}
+function initialLanguage() {
+  try { const s = localStorage.getItem("hfc.lang"); if (s) return s; } catch (e) { /* none */ }
+  return (navigator.language || "").toLowerCase().startsWith("bg") ? "bg" : "en";
+}
+
+// ---------------------------------------------------------- waterfall ---
+const palette = (() => {
+  const stops = [[0, [2, 6, 20]], [0.15, [8, 24, 90]], [0.35, [0, 110, 200]], [0.55, [40, 200, 140]], [0.75, [245, 215, 60]], [1, [255, 255, 255]]];
+  const p = new Uint8Array(256 * 3);
+  for (let v = 0; v < 256; v++) {
+    const db = (v - 40) / 4, x = Math.min(1, Math.max(0, (db + 5) / 45));
+    let i = 0; while (i < stops.length - 2 && x > stops[i + 1][0]) i++;
+    const [x0, c0] = stops[i], [x1, c1] = stops[i + 1], f = (x - x0) / (x1 - x0);
+    for (let k = 0; k < 3; k++) p[v * 3 + k] = Math.round(c0[k] + f * (c1[k] - c0[k]));
+  }
+  return p;
+})();
+
+function receiverView(rx) {
+  let r = state.receivers[rx];
+  if (r && r.el) return r;
+  r = Object.assign(r || {}, { rx, lo: 0, hi: 0 });
+  const sec = document.createElement("section");
+  sec.className = "card rx";
+  sec.innerHTML = `<div class="head"><h2></h2><span class="info"></span><div class="spacer"></div>
+      <span class="rec" hidden><i></i><span class="rectext"></span><button class="recstop"></button></span>
+      <div class="legend"><span><i style="background:var(--dec)"></i><span class="lgd"></span></span><span><i style="background:var(--und)"></i><span class="lgu"></span></span></div></div>
+    <div class="marks"></div>
+    <div class="lane"></div>
+    <div class="wfwrap"><canvas class="wf" width="1024" height="240"></canvas><div class="wins"></div><div class="wfhint"></div></div>
+    <div class="axis"></div>`;
+  $("receivers").appendChild(sec);
+  r.el = sec; r.title = sec.querySelector("h2"); r.info = sec.querySelector(".info"); r.lane = sec.querySelector(".lane");
+  r.canvas = sec.querySelector("canvas"); r.ctx = r.canvas.getContext("2d"); r.axis = sec.querySelector(".axis");
+  r.hint = sec.querySelector(".wfhint"); r.marks = sec.querySelector(".marks"); r.rec = sec.querySelector(".rec");
+  r.wins = sec.querySelector(".wins");
+  // Dragging across the waterfall marks a frequency window (windowDialog).
+  const hzAt = (clientX) => { const b = r.canvas.getBoundingClientRect(); return r.lo + (clientX - b.left) / b.width * (r.hi - r.lo); };
+  r.canvas.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0 || !(r.hi > r.lo)) return;
+    r.drag = { x0: ev.clientX, x1: ev.clientX, on: false };
+    r.canvas.setPointerCapture(ev.pointerId);
+  });
+  r.canvas.addEventListener("pointermove", (ev) => {
+    const d = r.drag;
+    if (!d) return;
+    d.x1 = ev.clientX;
+    if (!d.on && Math.abs(d.x1 - d.x0) > 6) { d.on = true; d.el = document.createElement("div"); d.el.className = "dragsel"; r.wins.appendChild(d.el); }
+    if (d.on) {
+      const b = r.canvas.getBoundingClientRect();
+      d.el.style.left = (Math.min(d.x0, d.x1) - b.left) + "px";
+      d.el.style.width = Math.abs(d.x1 - d.x0) + "px";
+    }
+  });
+  const endDrag = (ev, use) => {
+    const d = r.drag;
+    r.drag = null;
+    if (!d || !d.on) return;
+    if (d.el) d.el.remove();
+    r.suppressClick = true;
+    if (use) {
+      const a = hzAt(d.x0), z = hzAt(ev.clientX);
+      openWindow(null, { lo: Math.round(Math.min(a, z)), hi: Math.round(Math.max(a, z)) });
+    }
+  };
+  r.canvas.addEventListener("pointerup", (ev) => endDrag(ev, true));
+  r.canvas.addEventListener("pointercancel", (ev) => endDrag(ev, false));
+  sec.querySelector(".recstop").onclick = () => send({ cmd: "record", rx, stop: true });
+  r.canvas.addEventListener("click", (ev) => {
+    if (r.suppressClick) { r.suppressClick = false; return; }  // the end of a drag
+    if (!(r.hi > r.lo)) return;
+    const b = r.canvas.getBoundingClientRect();
+    const hz = r.lo + (ev.clientX - b.left) / b.width * (r.hi - r.lo);
+    let best = null, bestD = 1e18;
+    for (const e of state.emissions.values()) {
+      if (e.rx !== rx || e.event === "end") continue;
+      const d = hz < e.lo ? e.lo - hz : hz > e.hi ? hz - e.hi : 0;
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    if (best && bestD < (r.hi - r.lo) / 150) select(key(best.rx, best.id));
+    else selectFree(rx, hz);
+  });
+  state.receivers[rx] = r;
+  renderRxTitle(r);
+  return r;
+}
+
+function renderRxTitle(r) {
+  if (!r.el) return;
+  const multi = Object.keys(state.receivers).length > 1;
+  const name = state.status && state.status.mode === "playback" && r.name === "Playback" ? t("recording") : r.name === "Demo" ? t("demoName") : r.name;
+  r.title.textContent = multi || name ? `${t("receiver", r.rx + 1)}${name ? " · " + name : ""}` : t("receiver", r.rx + 1);
+  const parts = [];
+  if (r.centre) parts.push(`${t("centreAt")} ${fmtKhz(r.centre)} kHz`);
+  if (r.rate) parts.push(`${fmtNum(r.rate / 1e6, 3)} ${t("rate")}`);
+  if (r.controllable === false && state.status && state.status.mode === "live") parts.push(t("viewOnly"));
+  r.info.textContent = parts.join(" · ");
+  r.hint.textContent = t("wfHint");
+  r.el.querySelector(".lgd").textContent = t("legendDecoded");
+  r.el.querySelector(".lgu").textContent = t("legendUnknown");
+}
+
+function drawAxis(r) {
+  r.axis.innerHTML = "";
+  if (!(r.hi > r.lo)) return;
+  const span = r.hi - r.lo, steps = [1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 2e5, 5e5, 1e6];
+  const step = steps.find((s) => span / s <= 10) || 2e6;
+  for (let f = Math.ceil(r.lo / step) * step; f <= r.hi; f += step) {
+    const s = document.createElement("span");
+    s.style.left = ((f - r.lo) / span * 100) + "%";
+    s.textContent = fmtNum(f / 1000, step < 1e4 ? 1 : 0);
+    r.axis.appendChild(s);
+  }
+}
+
+function waterfall(buf) {
+  const dv = new DataView(buf);
+  const rx = dv.getUint8(4), n = dv.getUint16(5, true);
+  const lo = dv.getFloat64(15, true), hi = dv.getFloat64(23, true);
+  const r = receiverView(rx);
+  if (r.canvas.width !== n) r.canvas.width = n;
+  if (lo !== r.lo || hi !== r.hi) { r.lo = lo; r.hi = hi; drawAxis(r); drawLane(r); loadMarkers(r); }
+  const h = r.canvas.height;
+  r.ctx.drawImage(r.canvas, 0, 0, n, h - 1, 0, 1, n, h - 1);
+  const row = r.ctx.createImageData(n, 1), v = new Uint8Array(buf, 31, n);
+  for (let i = 0; i < n; i++) {
+    const c = v[i] * 3;
+    row.data[4 * i] = palette[c]; row.data[4 * i + 1] = palette[c + 1]; row.data[4 * i + 2] = palette[c + 2]; row.data[4 * i + 3] = 255;
+  }
+  r.ctx.putImageData(row, 0, 0);
+  if (r.hint.style.display !== "none" && state.emissions.size) r.hint.style.display = "none";
+}
+
+function drawLane(r) {
+  if (!r || !r.lane || !(r.hi > r.lo)) return;
+  r.lane.innerHTML = "";
+  const span = r.hi - r.lo;
+  const W = r.lane.clientWidth;
+  // Left to right; a text that would run into the previous one is left out
+  // (the bar's tooltip still has it).
+  const list = [...state.emissions.values()].filter((e) => e.rx === r.rx && e.event !== "end").sort((a, b) => a.lo - b.lo);
+  let textEnd = -Infinity;
+  for (const e of list) {
+    const b = document.createElement("div");
+    const k = key(e.rx, e.id);
+    b.className = "bar " + (e.label ? "dec" : "und") + (k === state.selectedKey ? " sel" : "");
+    const left = (e.lo - r.lo) / span * 100, width = Math.max(0.35, (e.hi - e.lo) / span * 100);
+    b.style.left = left + "%";
+    b.style.width = width + "%";
+    // Text inside the bar when it fits, else beside it.
+    const text = e.label || fmtKhz(e.centre);
+    const textPx = text.length * 7 + 10;
+    const barPx = W * width / 100, barLeftPx = W * left / 100;
+    if (barPx >= textPx) {
+      if (barLeftPx >= textEnd) { b.textContent = text; textEnd = barLeftPx + barPx; }
+    } else {
+      b.classList.add("narrow");
+      const at = barLeftPx + barPx + 4;
+      if (at >= textEnd && at + textPx <= W + 40) {
+        const tag = document.createElement("span");
+        tag.className = "lanetag";
+        tag.style.left = `${at}px`;
+        tag.textContent = text;
+        r.lane.appendChild(tag);
+        textEnd = at + textPx;
+      }
+    }
+    b.title = `${fmtKhz(e.centre)} kHz · ${fmtInt(e.hi - e.lo)} Hz · ${fmtNum(e.snr, 1)} dB${e.label ? " · " + e.label : ""}`;
+    b.onclick = () => select(k);
+    r.lane.appendChild(b);
+  }
+}
+
+
+// ------------------------------------------- frequency databases ----
+// Markers above the waterfall (as WebSDR and KiwiSDR sites show them), the
+// databases window and its search, the recording tasks.
+let dbOff = new Set(), onAirOnly = true, catOff = new Set();
+try {
+  dbOff = new Set(JSON.parse(localStorage.getItem("hfc.dbOff") || "[]")); onAirOnly = localStorage.getItem("hfc.onAirOnly") !== "0";
+  catOff = new Set(JSON.parse(localStorage.getItem("hfc.catOff") || "[]"));
+} catch (e) { /* defaults */ }
+const catOf = (m) => (m.cat === undefined || !state.databases) ? null : (state.databases.categories || []).find((c) => c.key === m.cat) || null;
+state.recording = {}; state.databases = null; state.tasks = null; state.canRecord = false;
+const hhmm = (min) => String(Math.floor(min / 60)).padStart(2, "0") + String(min % 60).padStart(2, "0");
+const markKind = (m) => (m.mode === "AM broadcast" ? "bc" : m.mode ? "ut" : /time signal/.test(m.label) ? "ts" : m.demod === "AM" ? "bc" : "ot");
+const markTitle = (m) => `${fmtKhz(m.hz)} kHz · ${catOf(m) ? catOf(m).name + " · " : ""}${m.label || m.mode}${m.start !== undefined ? " · " + t("markHours", hhmm(m.start), hhmm(m.stop)) + " · " + (m.on ? t("markOn") : t("markOff")) : ""} · ${m.source}`;
+const canControl = (r) => !!(r && r.controllable && state.status && state.status.mode !== "playback" && state.status.source_state === "connected");
+const firstRx = () => Number(Object.keys(state.receivers)[0] || 0);
+
+function loadMarkers(r) {
+  if (!r || !(r.hi > r.lo)) return;
+  const k = r.lo + ":" + r.hi;
+  r.markKey = k;
+  fetch(`/api/markers?lo_khz=${r.lo / 1000}&hi_khz=${r.hi / 1000}`).then((x) => x.json()).then((d) => {
+    if (r.markKey !== k) return;
+    r.markers = d.markers; drawMarks(r);
+  }).catch(() => {});
+}
+// One marker per frequency and label (a schedule lists a station once per
+// broadcast: the one on the air now stands for them).
+function shownMarkers(list) {
+  const by = new Map();
+  for (const m of list || []) {
+    if (dbOff.has(m.source)) continue;
+    if (m.cat !== undefined && catOff.has(m.cat)) continue;
+    const k = m.hz + "|" + m.label, old = by.get(k);
+    if (!old || (m.on && !old.on)) by.set(k, m);
+  }
+  return [...by.values()].filter((m) => m.on || !onAirOnly).sort((a, b) => a.hz - b.hz);
+}
+function drawMarks(r) {
+  if (!r || !r.marks) return;
+  r.marks.innerHTML = "";
+  if (!(r.hi > r.lo)) return;
+  const W = r.marks.clientWidth, span = r.hi - r.lo, rowEnd = [-Infinity, -Infinity];
+  for (const m of shownMarkers(r.markers)) {
+    const x = (m.hz - r.lo) / span * W;
+    if (x < 0 || x > W) continue;
+    const el = document.createElement("div"), text = m.label || m.mode, w = Math.min(170, text.length * 6.3 + 12);
+    const row = x >= rowEnd[0] ? 0 : x >= rowEnd[1] ? 1 : -1;
+    el.className = "mark " + (m.source === "my markers" ? "my" : markKind(m)) + (m.on ? "" : " off") + (row < 0 ? " tick" : "");
+    const cat = catOf(m);
+    if (cat && cat.color && m.source !== "my markers") el.style.background = cat.color;
+    el.style.left = x + "px";
+    if (row >= 0) { el.style.top = (row ? 21 : 2) + "px"; el.textContent = text; rowEnd[row] = x + w + 3; }
+    el.title = markTitle(m);
+    el.onclick = () => goTo(r.rx, m);
+    r.marks.appendChild(el);
+  }
+  drawWindows(r);
+}
+
+// ------------------------------------------------- frequency windows ----
+// The user's windows (decode_windows.json): a decoder for the signals in
+// them, or none at all. Shown over the waterfall; made by dragging across
+// it; listed in Settings -> Processing.
+state.windows = []; state.decoderNames = [];
+const choosable = (n) => state.decoderNames.includes(n) || /^RTTY \d+(\.\d+)?\/\d+$/.test(n || "");
+const winText = (w) => (w.decoder === "none" ? t("winLabelNone") : w.decoder);
+function loadWindows() {
+  fetch("/api/windows").then((x) => x.json()).then((d) => {
+    state.windows = d.windows || []; state.decoderNames = d.decoders || []; state.canSaveWindows = !!d.can_save;
+    Object.values(state.receivers).forEach(drawWindows);
+    if ($("settingsDlg").open) renderWindowList();
+  }).catch(() => {});
+}
+function drawWindows(r) {
+  if (!r || !r.wins) return;
+  r.wins.querySelectorAll(".win").forEach((x) => x.remove());
+  if (!(r.hi > r.lo)) return;
+  for (const w of state.windows) {
+    if (w.hi_hz < r.lo || w.lo_hz > r.hi) continue;
+    const a = Math.max(0, (w.lo_hz - r.lo) / (r.hi - r.lo)), z = Math.min(1, (w.hi_hz - r.lo) / (r.hi - r.lo));
+    const el = document.createElement("div");
+    el.className = "win " + (w.decoder === "none" ? "none" : "dec");
+    el.style.left = (100 * a) + "%"; el.style.width = (100 * (z - a)) + "%";
+    const b = document.createElement("button");
+    b.textContent = winText(w);
+    b.title = `${fmtKhz(w.lo_hz)}–${fmtKhz(w.hi_hz)} kHz · ${winText(w)}`;
+    b.onclick = (ev) => { ev.stopPropagation(); openWindow(w); };
+    el.appendChild(b);
+    r.wins.appendChild(el);
+  }
+}
+function decoderOptions(sel, current, first) {
+  const names = [...state.decoderNames];
+  if (current && !names.includes(current) && current !== "none" && current !== "rtty") names.push(current);
+  sel.innerHTML = first.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("") +
+    names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  sel.value = current || first[0][0];
+}
+let winEditing = null, winSaving = null;
+function openWindow(w, defaults) {
+  if (!state.canSaveWindows) { toast(t("e_not_available"), true); return; }
+  winEditing = w;
+  const f = $("winForm"), v = w || defaults || {};
+  $("winTitle").textContent = t(w ? "winTitleEdit" : "winTitleNew");
+  f.lo.value = v.lo_hz !== undefined ? (v.lo_hz / 1000).toFixed(3) : (v.lo / 1000).toFixed(3);
+  f.hi.value = v.hi_hz !== undefined ? (v.hi_hz / 1000).toFixed(3) : (v.hi / 1000).toFixed(3);
+  decoderOptions(f.decoder, v.decoder || "none", [["none", t("winNone")], ["rtty", t("winRttyOther")]]);
+  const syncRtty = () => { $("winRtty").hidden = f.decoder.value !== "rtty"; };
+  f.decoder.onchange = syncRtty; syncRtty();
+  f.baud.value = 50; f.shift.value = 85;
+  $("winDelete").hidden = !w;
+  $("winErr").textContent = "";
+  $("winDlg").showModal();
+}
+$("winForm").addEventListener("submit", (ev) => {
+  if (ev.submitter && ev.submitter.value !== "save") return;
+  ev.preventDefault();
+  const f = $("winForm");
+  let decoder = f.decoder.value;
+  if (decoder === "rtty") decoder = `RTTY ${Number(f.baud.value)}/${Math.round(Number(f.shift.value))}`;
+  winSaving = "save";
+  send(Object.assign({ cmd: "window_save", lo_hz: Math.round(Number(f.lo.value) * 1000), hi_hz: Math.round(Number(f.hi.value) * 1000), decoder },
+    winEditing ? { id: winEditing.id } : {}));
+});
+$("winDelete").onclick = () => { if (winEditing) { winSaving = "delete"; send({ cmd: "window_delete", id: winEditing.id }); } };
+function renderWindowList() {
+  const box = $("sWindows");
+  if (!state.windows.length) { box.innerHTML = `<div class="muted">${esc(t("sWindowsNone"))}</div>`; return; }
+  box.innerHTML = [...state.windows].sort((a, b) => a.lo_hz - b.lo_hz).map((w) =>
+    `<div><span class="f">${fmtKhz(w.lo_hz)}–${fmtKhz(w.hi_hz)} kHz</span><span>${esc(winText(w))}</span>` +
+    `<button type="button" data-win="${esc(w.id)}">${esc(t("winEditBtn"))}</button></div>`).join("");
+  box.querySelectorAll("[data-win]").forEach((b) => (b.onclick = () => openWindow(state.windows.find((x) => x.id === b.dataset.win))));
+}
+// Sets SDRconnect to a listed frequency: its demodulator, filter and VFO,
+// after moving the band there when the frequency is outside it.
+function goTo(rx, m) {
+  const r = state.receivers[rx];
+  if (!r) return;
+  const mode = m.demod || "USB", bw = mode === "CW" ? 500 : mode === "AM" ? 8000 : 3000;
+  const box = $("details");
+  box.dataset.mode = mode; box.dataset.bw = bw; delete box.dataset.bwSet;
+  state.selectedKey = null; state.selectedFree = { rx, centre: m.hz, marker: m }; selectedRow = null;
+  Object.values(state.receivers).forEach(drawLane);
+  renderTable(); renderDetails();
+  if (!canControl(r)) { toast(t("markNoControl")); return; }
+  const listen = () => { pending.listen = { f: fmtKhz(m.hz), m: mode }; send({ cmd: "listen", rx, freq: m.hz, mode, bw, dial: 1 }); };
+  const margin = (r.hi - r.lo) * 0.05;
+  if (r.hi > r.lo && m.hz > r.lo + margin && m.hz < r.hi - margin) { listen(); return; }
+  // The band's centre a little above, so that the signal is clear of it.
+  const centre = Math.round(m.hz + Math.min((r.rate || 0) / 5, 20000));
+  pending.tune = fmtKhz(centre);
+  send({ cmd: "tune", rx, centre });
+  setTimeout(listen, 900);
+}
+
+function loadDatabases() { fetch("/api/databases").then((x) => x.json()).then((d) => { state.databases = d; if ($("dbDlg").open) renderDb(); }).catch(() => {}); }
+let dbFound = null, dbQuery = "";
+function renderDb() {
+  const d = state.databases || { databases: [] }, box = $("dbBody");
+  box.innerHTML = `<p>${esc(t("dbIntro"))}</p>` +
+    d.databases.map((b, i) => `<label class="dbrow"><input type="checkbox" data-db="${i}" ${dbOff.has(b.name) ? "" : "checked"}> <b>${esc(b.name)}</b> <span class="n">${esc(t("dbEntries", b.entries))}</span></label>`).join("") +
+    `<label class="dbrow"><input type="checkbox" id="dbOnAir" ${onAirOnly ? "checked" : ""}> ${esc(t("dbOnAir"))}</label>
+    <div class="note">${esc(t("catTitle"))}</div>` +
+    ((d.categories || []).length ? `<div class="decfams">` + d.categories.map((c) => `<label><input type="checkbox" data-cat="${c.key}" ${catOff.has(c.key) ? "" : "checked"}> <span class="mark" style="position:static;display:inline-block;background:${esc(c.color || "#ddd")}">${esc(c.name)}</span></label>`).join("") + `</div>`
+      : `<p class="muted">${esc(t("catNone"))}</p>`) +
+    `
+    <p class="note">${esc(t("dbAdd"))}${d.folder ? "<br><code>" + esc(d.folder) + "</code>" : ""}</p>
+    <p>${d.can_open && d.folder ? `<button id="dbOpen">${esc(t("dbOpen"))}</button> ` : ""}${d.can_reload ? `<button id="dbReload">${esc(t("dbReload"))}</button>` : ""}</p>
+    <input id="dbSearch" type="search" style="width:100%" placeholder="${esc(t("dbSearch"))}" value="${esc(dbQuery)}">
+    <div id="dbFound"></div>
+    <h3>${esc(t("dlTitle"))}</h3><p class="note">${esc(t("dlText"))}</p>
+    <p><button id="dlBtn" ${state.download && state.download.state === "running" ? "disabled" : ""}>${esc(t("dlBtn"))}</button></p>
+    <div class="dlitems">${downloadHtml()}</div>
+    <h3>${esc(t("myTitle"))}</h3><div id="myList">${myListHtml()}</div>
+    <p><button id="myAdd">${esc(t("myAdd"))}</button></p>`;
+  box.querySelectorAll("[data-db]").forEach((el) => (el.onchange = () => {
+    const name = d.databases[Number(el.dataset.db)].name;
+    if (el.checked) dbOff.delete(name); else dbOff.add(name);
+    try { localStorage.setItem("hfc.dbOff", JSON.stringify([...dbOff])); } catch (e) { /* not kept */ }
+    Object.values(state.receivers).forEach(drawMarks); renderFound();
+  }));
+  box.querySelectorAll("[data-cat]").forEach((el) => (el.onchange = () => {
+    const k = Number(el.dataset.cat);
+    if (el.checked) catOff.delete(k); else catOff.add(k);
+    try { localStorage.setItem("hfc.catOff", JSON.stringify([...catOff])); } catch (e) { /* not kept */ }
+    Object.values(state.receivers).forEach(drawMarks); renderFound();
+  }));
+  $("dbOnAir").onchange = () => {
+    onAirOnly = $("dbOnAir").checked;
+    try { localStorage.setItem("hfc.onAirOnly", onAirOnly ? "1" : "0"); } catch (e) { /* not kept */ }
+    Object.values(state.receivers).forEach(drawMarks); renderFound();
+  };
+  if ($("dbOpen")) $("dbOpen").onclick = () => send({ cmd: "open_folder", which: "frequencies" });
+  if ($("dbReload")) $("dbReload").onclick = () => send({ cmd: "reload_databases" });
+  $("dlBtn").onclick = () => { state.download = { state: "running", items: [] }; renderDb(); send({ cmd: "download_databases" }); };
+  $("myAdd").onclick = () => openMarker(null, { hz: (state.selectedFree && state.selectedFree.centre) || 0 });
+  box.querySelectorAll("[data-myedit]").forEach((b) => (b.onclick = () => openMarker(state.myMarkers.find((m) => m.id === b.dataset.myedit))));
+  box.querySelectorAll("[data-mygo]").forEach((b) => (b.onclick = () => {
+    const m = state.myMarkers.find((x) => x.id === b.dataset.mygo);
+    if (m) { $("dbDlg").close(); goTo(firstRx(), { hz: m.hz, label: m.label, mode: "", source: "my markers", demod: m.demod, on: true }); }
+  }));
+  let timer = null;
+  $("dbSearch").oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      dbQuery = $("dbSearch").value.trim();
+      if (dbQuery.length < 2) { dbFound = null; renderFound(); return; }
+      const q = dbQuery;
+      fetch(`/api/markers?limit=400&text=${encodeURIComponent(q)}`).then((x) => x.json()).then((r) => { if (q === dbQuery) { dbFound = r; renderFound(); } }).catch(() => {});
+    }, 250);
+  };
+  renderFound();
+}
+function renderFound() {
+  const box = $("dbFound");
+  if (!box) return;
+  if (!dbFound) { box.innerHTML = ""; return; }
+  const list = shownMarkers(dbFound.markers).slice(0, 150);
+  box.innerHTML = list.length ? `<div class="found">` + list.map((m, i) => `<div data-i="${i}" title="${esc(markTitle(m))}"><span class="f">${fmtKhz(m.hz)}</span><span>${esc(m.label || m.mode)}</span><span class="src">${esc(m.source)}</span></div>`).join("") + `</div>` +
+    (dbFound.more ? `<p class="note">${esc(t("dbMore", dbFound.more))}</p>` : "") : `<p class="muted">${esc(t("dbNone"))}</p>`;
+  box.querySelectorAll("[data-i]").forEach((el) => (el.onclick = () => { $("dbDlg").close(); goTo(firstRx(), list[Number(el.dataset.i)]); }));
+}
+$("openDb").onclick = () => { loadDatabases(); renderDb(); $("dbDlg").showModal(); };
+$("closeDb").onclick = () => $("dbDlg").close();
+
+
+// ------------------------------------------------- downloads, my markers ----
+state.myMarkers = []; state.download = null;
+function loadMyMarkers() {
+  fetch("/api/my_markers").then((x) => x.json()).then((d) => {
+    state.myMarkers = d.markers || [];
+    if ($("dbDlg").open) renderDb();
+    renderDetails();
+  }).catch(() => {});
+}
+function downloadHtml() {
+  const d = state.download;
+  if (!d) return "";
+  const why = (e) => (L().dlWhy || T.en.dlWhy)[e] || e;
+  return (d.items || []).map((i) => i.ok ? `<div class="ok">✓ ${esc(t("dlOk", i.name, i.entries))}</div>` : `<div class="bad">✗ ${esc(t("dlBad", i.name, why(i.error)))}</div>`).join("") +
+    (d.state === "running" ? `<div class="muted">${esc(t("dlRunning"))}</div>` : "");
+}
+function myListHtml() {
+  if (!state.myMarkers.length) return `<p class="muted">${esc(t("myNone"))}</p>`;
+  return `<div class="found">` + [...state.myMarkers].sort((a, b) => a.hz - b.hz).map((m) =>
+    `<div><span class="f" data-mygo="${esc(m.id)}" style="cursor:pointer">${fmtKhz(m.hz)}</span><span data-mygo="${esc(m.id)}" style="cursor:pointer"><b>${esc(m.label)}</b>${m.note ? " · " + esc(m.note) : ""}</span>` +
+    `<span class="src">${esc(m.demod || "")} <button data-myedit="${esc(m.id)}">${esc(t("myEdit"))}</button></span></div>`).join("") + `</div>`;
+}
+// The user's marker a listed entry is (by frequency and label), if any.
+function myMarkerOf(mk) {
+  if (!mk || mk.source !== "my markers") return null;
+  return state.myMarkers.find((m) => Math.abs(m.hz - mk.hz) < 1 && (mk.label === m.label || mk.label.startsWith(m.label + " - "))) || null;
+}
+let markerEditing = null;
+function openMarker(m, defaults) {
+  markerEditing = m;
+  const f = $("markerForm");
+  const v = m || defaults || {};
+  $("markerTitle").textContent = t(m ? "mkEdit" : "mkNew");
+  f.khz.value = v.hz ? (v.hz / 1000).toFixed(3) : "";
+  f.label.value = v.label || "";
+  f.note.value = v.note || "";
+  f.demod.value = v.demod || "";
+  decoderOptions(f.decoder, v.decoder || "", [["", t("mkDecoderAuto")]]);
+  $("markerDelete").hidden = !m;
+  $("markerErr").textContent = "";
+  $("markerDlg").showModal();
+}
+let markerSaving = null;
+$("markerForm").addEventListener("submit", (ev) => {
+  if (ev.submitter && ev.submitter.value !== "save") return;
+  ev.preventDefault();
+  const f = $("markerForm");
+  markerSaving = "save";
+  send(Object.assign({ cmd: "marker_save", hz: Math.round(Number(f.khz.value) * 1000), label: f.label.value.trim(), note: f.note.value.trim(), demod: f.demod.value,
+    decoder: f.decoder.value },
+    markerEditing ? { id: markerEditing.id } : {}));
+});
+$("markerDelete").onclick = () => { if (markerEditing) { markerSaving = "delete"; send({ cmd: "marker_delete", id: markerEditing.id }); } };
+// The marker for what is selected: the emission, or the point clicked.
+function markerDefaults(e, free) {
+  const mk = free && free.marker;
+  const box = $("details");
+  // A signal a decoder has read (green): that decoder, for "decode only with".
+  // (Some decoders name what they read otherwise than they are offered.)
+  const named = { "ALE 3G": "ALE 3G/4G", "ALE 4G": "ALE 3G/4G", "DRM-type OFDM": "DRM", NAVTEX: "SITOR-B" };
+  const label = e && e.label ? named[e.label] || e.label : "";
+  const decoder = label && choosable(label) ? label : "";
+  return { hz: e ? e.centre : free.centre, label: mk ? mk.label : (e && e.label) || "", note: "", demod: (mk && mk.demod) || box.dataset.mode || "", decoder };
+}
+
+// ---------------------------------------------------- recording tasks ----
+function loadTasks() {
+  fetch("/api/tasks").then((x) => x.json()).then((d) => {
+    state.tasks = d; state.canRecord = !!d.can_record;
+    if ($("tasksDlg").open) renderTasks();
+    renderDetails();
+  }).catch(() => {});
+}
+const taskTitle = (id) => { const k = ((state.tasks && state.tasks.tasks) || []).find((x) => x.id === id); return k ? k.title : t("g_unknown")[0]; };
+// The task a recording of this emission (or listed frequency) belongs to:
+// by its label, the listing, or the first mode it is consistent with.
+function taskFor(e, marker) {
+  const names = [];
+  if (marker && marker.mode) names.push(marker.mode);
+  if (e) {
+    if (e.label) names.push(e.label);
+    const f = e.features || {};
+    for (const l of f.listed || []) if (l.mode) names.push(l.mode);
+    for (const c of f.consistent || []) names.push(c.mode);
+  }
+  const alias = { "SITOR-B": "navtex", NAVTEX: "navtex", DSC: "dsc", "4:3 code": "t600", "ALE 3G": "ale3g", "ALE 4G": "ale3g" };
+  for (const n of names) {
+    if (alias[n]) return alias[n];
+    for (const k of (state.tasks && state.tasks.tasks) || []) {
+      if ((k.modes || []).includes(n)) return k.id;
+    }
+    if (/^RTTY/.test(n)) return "rtty";
+    if (/^Q?PSK\d/.test(n)) return "psk";
+  }
+  return "unknown";
+}
+function startRecording(rx, task, hz, seconds) {
+  pending.record = true;
+  send({ cmd: "record", rx, task, freq: Math.round(hz || 0), seconds });
+}
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function renderRec(r) {
+  if (!r || !r.rec) return;
+  const m = state.recording[r.rx];
+  r.rec.hidden = !(m && m.active);
+  r.rec.querySelector(".recstop").textContent = t("recStop");
+  if (m && m.active) r.rec.querySelector(".rectext").textContent = t("recState", mmss(m.seconds), mmss(m.of), taskTitle(m.task));
+  if ($("tasksDlg").open) $("tasksBody").querySelectorAll("[data-rec]").forEach((b) => (b.disabled = !state.canRecord || !!(m && m.active)));
+}
+let taskFreq = {};  // the frequency last chosen for a task, for the recording's name
+function renderTasks() {
+  const d = state.tasks, box = $("tasksBody");
+  if (!d) { box.innerHTML = ""; return; }
+  const rx = firstRx(), rec = state.recording[rx], busy = !!(rec && rec.active);
+  let html = `<p>${esc(t("tasksIntro"))}</p><p class="note">${esc(t("tasksHow"))}</p>` +
+    (d.can_record ? "" : `<p class="note"><b>${esc(t("recOff"))}</b></p>`) +
+    (d.folder ? `<p><button id="recOpen">${esc(t("recOpen"))}</button> <code class="muted">${esc(d.folder)}</code></p>` : "");
+  const shown = [];
+  for (const g of ["check", "structure", "learn", "nospec", "planned", "unknown"]) {
+    const ts = d.tasks.filter((k) => k.group === g);
+    if (!ts.length) continue;
+    html += `<h3>${esc(t("g_" + g)[0])}</h3><p>${esc(t("g_" + g)[1])}</p>`;
+    for (const k of ts) {
+      const fr = shownMarkersAll(k.freqs).slice(0, 14);
+      html += `<div class="task"><div class="thead"><b>${esc(k.title)}</b><span class="have ${k.have >= k.want ? "done" : ""}">${esc(t("taskHave", k.have, k.want))}</span><span class="spacer"></span>` +
+        `<button data-rec="${esc(k.id)}" ${d.can_record && !busy ? "" : "disabled"}>${esc(t("recBtn", Math.round(k.seconds / 60)))}</button></div>` +
+        (fr.length ? `<div class="fq">` + fr.map((m) => { shown.push(m); return `<button data-f="${shown.length - 1}" data-task="${esc(k.id)}" class="${m.on ? "" : "off"}" title="${esc(markTitle(m))}">${fmtNum(m.hz / 1000, 1)}</button>`; }).join("") +
+          (k.listed > fr.length ? `<span class="muted" style="font-size:12px;align-self:center">${esc(t("taskMore", k.listed - fr.length))}</span>` : "") + `</div>`
+          : g === "unknown" ? "" : `<p class="note">${esc(t("taskNoFreq"))}</p>`) + `</div>`;
+    }
+  }
+  box.innerHTML = html;
+  if ($("recOpen")) $("recOpen").onclick = () => send({ cmd: "open_folder", which: "recordings" });
+  box.querySelectorAll("[data-f]").forEach((el) => (el.onclick = () => { const m = shown[Number(el.dataset.f)]; taskFreq[el.dataset.task] = m.hz; goTo(rx, m); }));
+  box.querySelectorAll("[data-rec]").forEach((el) => (el.onclick = () => {
+    const k = d.tasks.find((x) => x.id === el.dataset.rec), free = state.selectedFree, e = state.selectedKey && state.emissions.get(state.selectedKey);
+    startRecording(rx, k.id, taskFreq[k.id] || (e ? e.centre : free ? free.centre : 0), k.seconds);
+  }));
+}
+// For the tasks: every listed frequency once, those on the air now first.
+function shownMarkersAll(list) {
+  const by = new Map();
+  for (const m of list || []) { const old = by.get(m.hz); if (!old || (m.on && !old.on)) by.set(m.hz, m); }
+  return [...by.values()].sort((a, b) => (b.on - a.on) || (a.hz - b.hz));
+}
+$("openTasks").onclick = () => { loadTasks(); renderTasks(); $("tasksDlg").showModal(); };
+$("closeTasks").onclick = () => $("tasksDlg").close();
+window.addEventListener("resize", () => Object.values(state.receivers).forEach(drawMarks));
+setInterval(() => Object.values(state.receivers).forEach(loadMarkers), 300000);  // who is on the air changes
+
+
+// --------------------------------------------------------- processing ----
+// The program's "usage" reports (every 2 s, per receiver): the load chip in
+// the top bar and its panel, and what is being done with each emission
+// (the table's Kind column, the selected emission's panel).
+const FAMILIES = ["CW", "PSK", "RTTY", "SITOR-B", "DSC", "ALE", "Akula", "4:3 code", "FAX", "SSTV", "TIME", "DRM", "FT8", "FT4", "WSPR", "HFDL"];
+state.usage = {};
+state.proc = new Map();  // key(rx, id) -> its session: state, decoder, age, pct
+state.left = new Map();  // key(rx, id) -> why it was left: g, i, m
+state.lag = {};          // rx -> { at, dropped }: when IQ was last dropped
+function actName(n) {
+  if (n.startsWith("decoder ")) return t("actDecoder", n.slice(8));
+  return (L().act || T.en.act)[n] || n;
+}
+function onUsage(m) {
+  const was = state.usage[m.rx];
+  if (was && m.dropped > (was.dropped || 0)) state.lag[m.rx] = { at: Date.now(), dropped: m.dropped };
+  state.usage[m.rx] = m;
+  for (const k of [...state.proc.keys()]) if (k.startsWith(m.rx + ":")) state.proc.delete(k);
+  for (const k of [...state.left.keys()]) if (k.startsWith(m.rx + ":")) state.left.delete(k);
+  for (const x of m.sessions || []) state.proc.set(key(m.rx, x.id), x);
+  for (const [id, why] of Object.entries(m.left_ids || {})) state.left.set(key(m.rx, Number(id)), why);
+  renderLoad();
+  renderTableSoon();
+  if (state.selectedKey && state.selectedKey.startsWith(m.rx + ":")) renderDetailsSoon();
+}
+const lagging = () => Object.values(state.lag).some((v) => Date.now() - v.at < 30000);
+function renderLoad() {
+  const us = Object.values(state.usage);
+  const chip = $("loadChip");
+  chip.hidden = !us.length;
+  if (!us.length) return;
+  const busy = Math.max(...us.map((u) => u.busy || 0));
+  const decoding = us.reduce((a, u) => a + u.counts.decoding, 0);
+  chip.className = "status loadchip " + (lagging() ? "bad" : busy >= 80 ? "warn" : "ok");
+  $("loadText").textContent = t("loadChip", fmtInt(busy), decoding);
+  chip.title = lagging() ? t("lagTitle") : t("loadTip");
+  if (!$("loadPanel").hidden) renderLoadPanel();
+}
+function renderLoadPanel() {
+  const us = Object.values(state.usage);
+  let html = `<h2 id="loadTitle">${esc(t("loadTitle"))}</h2>`;
+  if (lagging()) {
+    const secs = Object.values(state.lag).reduce((a, v) => a + v.dropped, 0);
+    html += `<p class="lag">${esc(t("lagText", fmtNum(secs, 0)))}</p>`;
+  }
+  if (!us.length) html += `<p class="muted">${esc(t("resNone"))}</p>`;
+  for (const u of us) {
+    if (us.length > 1) html += `<h3>${esc(t("receiver", u.rx + 1))}</h3>`;
+    html += `<p><b>${esc(t("loadBusy", fmtInt(u.busy || 0)))}</b><br><span class="muted">${esc(t("loadCpu", fmtInt(u.cpu)))}</span></p>` +
+      `<div class="note">${esc(t("resActivities"))}</div>`;
+    const top = Math.max(1, ...u.items.map((i) => i.pct));
+    for (const i of u.items.filter((i) => i.pct >= 0.05))
+      html += `<div class="usebar"><span>${esc(actName(i.name))}</span><span class="b"><i style="width:${Math.min(100, 100 * i.pct / top)}%"></i></span><span class="v">${fmtNum(i.pct, 1)} %</span></div>`;
+    html += `<p class="note">${esc(t("resCounts", u.counts.decoding, u.counts.trying, u.counts.measuring))}<br>${esc(t("resLeft", u.left.given_up, u.left.ignored, u.left.measured))}</p>`;
+  }
+  html += `<div class="actions"><button id="lpSignals">${esc(t("loadShowSignals"))}</button>` +
+    `<button id="lpSettings">${esc(t("loadOpenSettings"))}</button><button id="lpClose">${esc(t("close"))}</button></div>`;
+  const panel = $("loadPanel");
+  panel.innerHTML = html;
+  $("lpSignals").onclick = () => { closeLoadPanel(); state.filterLabel = "~proc"; $("fActive").checked = true; renderChips(); renderTable(); };
+  $("lpSettings").onclick = () => { closeLoadPanel(); openSettings("processing"); };
+  $("lpClose").onclick = closeLoadPanel;
+}
+function closeLoadPanel() { $("loadPanel").hidden = true; $("loadChip").setAttribute("aria-expanded", "false"); }
+$("loadChip").onclick = () => {
+  const panel = $("loadPanel");
+  if (!panel.hidden) { closeLoadPanel(); return; }
+  panel.hidden = false;
+  $("loadChip").setAttribute("aria-expanded", "true");
+  renderLoadPanel();
+};
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !$("loadPanel").hidden) closeLoadPanel(); });
+document.addEventListener("click", (ev) => {
+  if (!$("loadPanel").hidden && !$("loadPanel").contains(ev.target) && !$("loadChip").contains(ev.target)) closeLoadPanel();
+});
+setInterval(renderLoad, 5000);  // the chip turns back from red 30 s after the last drop
+// What is being done with an emission now, for the table: "" when nothing
+// worth saying (decoding shows as its label already).
+function procTag(e) {
+  if (state.mode !== "live") return "";
+  const k = key(e.rx, e.id), p = state.proc.get(k), why = state.left.get(k);
+  if (p && p.state === "trying") return `<span class="ptag try" title="${esc(p.decoder)}">${esc(t("p_trying"))}</span>`;
+  if (p && p.state === "measuring") return `<span class="ptag">${esc(t("p_measuring"))}</span>`;
+  if (!p && why) return `<span class="ptag left">${esc(t("p_left_" + why))}</span>`;
+  return "";
+}
+// The same, in words, for the selected emission's panel.
+function procHtml(e) {
+  if (state.mode !== "live" || e.event === "end") return "";
+  const k = key(e.rx, e.id), p = state.proc.get(k), why = state.left.get(k);
+  let html = `<div class="note">${esc(t("dProc"))}</div>`;
+  if (p) {
+    const what = p.state === "decoding" ? t("dProcDecoding", p.decoder) : p.state === "trying" ? t("dProcTrying", p.decoder) : t("dProcMeasuring");
+    html += `<p>${esc(what)}<br><span class="muted">${esc(t("dProcFor", fmtDur(p.age), fmtNum(p.pct, 1)))}</span></p>` +
+      `<p><button id="dStop" title="${esc(t("resStopTip"))}">${esc(t("stopDecoding"))}</button></p>`;
+  } else if (why) {
+    html += `<p class="muted">${esc(t("dProcLeft_" + why))}</p>`;
+  } else {
+    html += `<p class="muted">${esc(t("dProcNone"))}</p>`;
+  }
+  return html;
+}
+
+// -------------------------------------------------------- connection ----
+const stateClass = { connected: "ok", playback: "ok", demo: "ok", playback_done: "ok", view_only: "warn", connecting: "busy", starting_headless: "busy", measuring: "busy", waiting_radio: "busy", no_radio: "bad",
+  no_answer: "bad", websocket_off: "bad", not_installed: "bad", headless_failed: "bad", playback_failed: "bad", no_iq: "bad" };
+
+function renderStatus() {
+  const s = state.status;
+  const el = $("status");
+  if (!s || !connectedToProgram) {
+    el.className = "status bad";
+    $("statusText").textContent = connectedToProgram ? t("st_connecting") : t("st_offline");
+  } else {
+    const st = s.source_state || "connecting";
+    el.className = "status " + (stateClass[st] || "busy");
+    const label = L()["st_" + st] !== undefined ? t("st_" + st, s.source_detail) : st;
+    $("statusText").textContent = label;
+  }
+  renderBanner();
+}
+
+function renderBanner() {
+  const b = $("banner"), s = state.status;
+  const st = s && connectedToProgram ? s.source_state : null;
+  const show = { no_answer: "bad", websocket_off: "bad", not_installed: "bad", headless_failed: "bad", no_iq: "bad", no_radio: "bad", starting_headless: "info",
+    view_only: "info", playback_failed: "bad", demo: "info" };
+  if (!st || !show[st]) { b.hidden = true; return; }
+  b.hidden = false;
+  b.className = "banner " + show[st];
+  const title = st === "no_answer" ? t("b_no_answer_t", s.source_detail || "127.0.0.1:5454") : t("b_" + st + "_t");
+  const steps = L()["b_" + st] || [];
+  let html = `<h2>${esc(title)}</h2>`;
+  if (st === "playback_failed") html += `<p class="mono">${esc(s.source_detail || "")}</p>`;
+  if (steps.length) html += "<ol>" + steps.map((x) => `<li>${esc(x)}</li>`).join("") + "</ol>";
+  const actions = [];
+  if (s.mode === "live" && st !== "view_only") actions.push(`<button class="primary" id="bRetry">${esc(t("retryNow"))}</button>`);
+  if (st === "not_installed") actions.push(`<a href="https://www.sdrplay.com/sdrconnect/" target="_blank" rel="noopener"><button>${esc(t("openDownload"))}</button></a>`);
+  if (s.mode === "live") actions.push(`<button id="bSettings">${esc(t("openSettings"))}</button>`);
+  if (s.diagnostics && show[st] === "bad") actions.push(`<button id="bDiag">${esc(t("diagOpen"))}</button>`);
+  html += `<div class="actions">${actions.join("")}</div>`;
+  b.innerHTML = html;
+  const r = $("bRetry"); if (r) r.onclick = () => { send({ cmd: "reconnect" }); toast(t("r_reconnect")); };
+  const o = $("bSettings"); if (o) o.onclick = () => openSettings();
+  const d = $("bDiag"); if (d) d.onclick = openDiag;
+}
+
+// ---------------------------------------------------------- emissions ----
+function renderHead() {
+  const multi = Object.keys(state.receivers).length > 1;
+  const cols = [multi ? ["colRx", ""] : null, ["colStart", ""], ["colFreq", "num"], ["colBw", "num"], ["colSnr", "num"],
+    ["colDur", "num"], ["colKind", ""], ["colText", ""]].filter(Boolean);
+  $("emHead").innerHTML = cols.map(([k, c]) => `<th class="${c}">${esc(t(k))}</th>`).join("");
+}
+
+function renderChips() {
+  const labels = Array.from(state.labels).sort();
+  const items = [["", t("all")], ["-", t("unknown")], ["~proc", t("beingProcessed")]].concat(labels.map((l) => [l, l]));
+  $("chips").innerHTML = items.map(([v, txt]) => `<button class="chip ${state.filterLabel === v ? "on" : ""}" data-v="${esc(v)}">${esc(txt)}</button>`).join("");
+  $("chips").querySelectorAll("button").forEach((btn) => (btn.onclick = () => { state.filterLabel = btn.dataset.v; renderChips(); renderTable(); updateExport(); }));
+}
+
+function filters() { return { label: state.filterLabel, text: $("fText").value.trim(), active: $("fActive").checked }; }
+function queryString() {
+  const f = filters(), q = new URLSearchParams();
+  if (f.label && f.label !== "~proc") q.set("label", f.label); if (f.text) q.set("text", f.text);
+  return q.toString();
+}
+function updateExport() {
+  const q = queryString();
+  $("exportCsv").href = "/export.csv" + (q ? "?" + q : "");
+  $("exportJson").href = "/export.json" + (q ? "?" + q : "");
+}
+
+let tableTimer = null;
+// What the feature meter measured, in words; "" when it found nothing clear.
+function featuresText(f) {
+  if (!f) return "";
+  const frame = f.frame_ms > 0 ? fmtNum(f.frame_ms, 1) : "";
+  if (!f.modulation) return frame ? t("f_repeats", frame) : "";
+  const r = f.symbol_rate > 0 ? t("f_rate", fmtNum(f.symbol_rate, f.symbol_rate < 100 ? 1 : 0)) : "";
+  const sp = fmtInt(f.spacing_hz);
+  const fr = frame ? t("f_frame", frame) : "";
+  switch (f.modulation) {
+    case "FSK": return t("f_FSK", sp, r) + fr;
+    case "MFSK": return t("f_MFSK", f.tones, sp, r) + fr;
+    case "multi-carrier": return t("f_multi", f.tones, sp, r) + fr;
+    case "PSK": return t("f_PSK", r) + fr;
+    case "OOK": return t("f_OOK") + fr;
+    case "carrier": return t("f_carrier");
+  }
+  return "";
+}
+function kindTag(e) {
+  if (e.label) return '<span class="tag">' + esc(e.label) + "</span>";
+  const ft = featuresText(e.features);
+  if (ft) {
+    const cons = (e.features.consistent || []).map((c) => c.mode).join(", ");
+    return `<span class="tag und" title="${esc(t("measuredTip") + (cons ? "\n" + t("dConsistent") + ": " + cons : ""))}">≈ ${esc(ft)}</span>`;
+  }
+  return '<span class="tag und">' + esc(t("unrecognised")) + "</span>";
+}
+
+function renderTableSoon() { if (!tableTimer) tableTimer = setTimeout(() => { tableTimer = null; renderTable(); }, 300); }
+function renderTable() {
+  const f = filters(), multi = Object.keys(state.receivers).length > 1;
+  let rows = state.mode === "search" ? state.searchRows : Array.from(state.emissions.values());
+  if (state.mode === "live") {
+    rows = rows.filter((e) => {
+      if (f.active && e.event === "end") return false;
+      if (f.label === "-" && e.label) return false;
+      if (f.label === "~proc" && !state.proc.has(key(e.rx, e.id))) return false;
+      if (f.label && f.label !== "-" && f.label !== "~proc" && e.label !== f.label) return false;
+      if (f.text && !(state.texts.get(key(e.rx, e.id)) || "").toLowerCase().includes(f.text.toLowerCase())) return false;
+      return true;
+    });
+  }
+  rows.sort((a, b) => b.start - a.start);
+  const total = rows.length;
+  rows = rows.slice(0, 500);
+  $("emCount").textContent = (state.mode === "search" ? t("logResults") + " · " : "") + t("shown", total);
+  $("searchLog").textContent = state.mode === "search" ? t("backToLive") : t("searchLog");
+  const html = rows.map((e) => {
+    const k = key(e.rx, e.id), text = state.mode === "search" ? "" : (state.texts.get(k) || "");
+    const live = e.event !== "end" && state.mode === "live";
+    return `<tr class="${k === state.selectedKey ? "sel " : ""}${live ? "" : "ended"}" data-k="${esc(k)}">` +
+      (multi ? `<td>${e.rx + 1}</td>` : "") +
+      `<td class="mono">${live ? '<span class="onair"></span>' : ""}${fmtTime(e.start)}</td>` +
+      `<td class="num">${fmtKhz(e.centre)}</td><td class="num">${fmtInt(occupied(e))}</td><td class="num">${fmtNum(e.snr, 1)}</td>` +
+      `<td class="num">${fmtDur(e.end - e.start)}</td>` +
+      `<td>${kindTag(e)}${procTag(e)}</td>` +
+      `<td class="text">${esc(text.slice(-140))}</td></tr>`;
+  }).join("");
+  $("emBody").innerHTML = html;
+  $("emEmpty").hidden = rows.length > 0;
+  $("emEmpty").textContent = state.emissions.size || state.mode === "search" ? t("noMatches") : t("noEmissions");
+  const byKey = new Map(rows.map((e) => [key(e.rx, e.id), e]));
+  $("emBody").querySelectorAll("tr").forEach((tr) => (tr.onclick = () => select(tr.dataset.k, byKey.get(tr.dataset.k))));
+}
+
+const occupied = (e) => (e.occ_hi > e.occ_lo && e.occ_lo > 0 ? e.occ_hi - e.occ_lo : e.hi - e.lo);
+
+// ------------------------------------------------------------ details ----
+let selectedRow = null;
+function select(k, row) {
+  state.selectedKey = k; state.selectedFree = null; selectedRow = row || null;
+  const e = state.emissions.get(k) || selectedRow;
+  if (e && e.label === "CW") $("details").dataset.mode = "CW";
+  Object.values(state.receivers).forEach(drawLane);
+  renderTable(); renderDetails();
+}
+function selectFree(rx, hz) {
+  state.selectedKey = null; state.selectedFree = { rx, centre: hz }; selectedRow = null;
+  Object.values(state.receivers).forEach(drawLane);
+  renderTable(); renderDetails();
+}
+
+function renderDetails() {
+  const box = $("details");
+  const e = state.selectedKey ? (state.emissions.get(state.selectedKey) || selectedRow) : null;
+  const free = state.selectedFree;
+  if (!e && !free) { box.innerHTML = `<p class="muted">${esc(t("pickEmission"))}</p>`; return; }
+  const rx = e ? e.rx : free.rx, r = state.receivers[rx] || {};
+  const centre = e ? e.centre : free.centre;
+  const playback = state.status && state.status.mode === "playback";
+  const can = !playback && r.controllable && state.status && ["connected"].includes(state.status.source_state);
+  let html = `<div class="freq">${fmtKhz(centre)} kHz</div>`;
+  const mk = free && free.marker;
+  if (mk) {
+    html += `<div class="note">${esc(t("dMarker"))}</div><p><b>${esc(mk.label || mk.mode)}</b><br><span class="muted">${catOf(mk) ? esc(catOf(mk).name) + " · " : ""}${esc(mk.source)}` +
+      (mk.start !== undefined ? ` · ${esc(t("markHours", hhmm(mk.start), hhmm(mk.stop)))} · ${esc(mk.on ? t("markOn") : t("markOff"))}` : "") +
+      `</span></p>`;
+    // Everything the lists have on this frequency (within 500 Hz), on the
+    // air now first, with its hours.
+    const rr = state.receivers[free.rx] || {};
+    const same = (rr.markers || []).filter((x) => Math.abs(x.hz - mk.hz) <= 500 && !(x.hz === mk.hz && x.label === mk.label && x.source === mk.source && x.start === mk.start))
+      .sort((a, b) => (b.on - a.on) || (a.hz - b.hz));
+    if (same.length) {
+      html += `<div class="note">${esc(t("dSame"))}</div><ul class="consistent">` + same.slice(0, 12).map((x) =>
+        `<li class="${x.on ? "" : "muted"}">${fmtKhz(x.hz)}: ${esc(x.label || x.mode)} <span class="muted">(${catOf(x) ? esc(catOf(x).name) + ", " : ""}${esc(x.source)}${x.start !== undefined ? ", " + esc(t("markHours", hhmm(x.start), hhmm(x.stop))) : ""})</span></li>`).join("") +
+        (same.length > 12 ? `<li class="muted">${esc(t("dSameMore", same.length - 12))}</li>` : "") + `</ul>`;
+    }
+    html += `<p class="note">${esc(t("listedNote"))}</p>`;
+  }
+  if (e) {
+    const onAir = e.event !== "end";
+    html += `<div style="margin-top:4px">${e.label ? '<span class="tag">' + esc(e.label) + "</span>" : '<span class="tag und">' + esc(t("unrecognised")) + "</span>"} ` +
+      `<span class="muted">${onAir ? '<span class="onair"></span>' + esc(t("dOnAir")) : esc(t("dEnded"))}</span></div>`;
+    const ft = featuresText(e.features);
+    html += `<dl>` + (ft ? `<dt>${esc(t("dMeasured"))}</dt><dd title="${esc(t("measuredTip"))}">${esc(ft)}</dd>` : "") +
+      `<dt>${esc(t("dOcc"))}</dt><dd>${fmtInt(occupied(e))} Hz</dd>` +
+      `<dt>${esc(t("dDet"))}</dt><dd>${fmtInt(e.hi - e.lo)} Hz</dd>` +
+      `<dt>${esc(t("dSnr"))}</dt><dd>${fmtNum(e.snr, 1)} / ${fmtNum(e.peak, 1)} dB</dd>` +
+      `<dt>${esc(t("dDur"))}</dt><dd>${fmtDur(e.end - e.start)}</dd>` +
+      `<dt>${esc(t("dDuty"))}</dt><dd>${fmtInt((e.duty || 0) * 100)} %</dd>` +
+      `<dt>${esc(t("dDrift"))}</dt><dd>${fmtNum(e.drift || 0, 2)} ${esc(t("hzPerS"))}</dd>` +
+      `<dt>${esc(t("dStart"))}</dt><dd>${fmtDateTime(e.start)}</dd>` +
+      (onAir ? "" : `<dt>${esc(t("dEnd"))}</dt><dd>${fmtDateTime(e.end)}</dd>`) + "</dl>";
+    const text = state.texts.get(key(e.rx, e.id)) || "";
+    if (ft && !e.label) html += `<p class="note">${esc(t("measuredNote"))}</p>`;
+    const cons = (!e.label && e.features && e.features.consistent) || [];
+    if (cons.length) {
+      html += `<div class="note">${esc(t("dConsistent"))}</div><ul class="consistent">` +
+        cons.map((c) => `<li>${esc(c.mode)} <span class="muted">(${esc(t("prov_" + c.provenance) || c.provenance)}${c.partial ? "; " + esc(t("partialMatch")) : ""}${c.frame ? "; " + esc(t("frameMatch")) : ""}${c.listed ? "; " + esc(t("listedMatch")) : ""})</span></li>`).join("") +
+        `</ul><p class="note">${esc(t("consistentNote"))}</p>`;
+    }
+    const pr = !e.label && e.features && e.features.predicted;
+    if (pr) {
+      const fam = t("fam_" + pr.family), pct = fmtInt(100 * pr.confidence);
+      html += `<div class="note">${esc(t("dModel"))}</div><p title="${esc(pr.model || "")}">${esc(pr.sure ? t("modelSure", fam, pct) : t("modelUnsure", fam, pct))}</p>` +
+        `<p class="note">${esc(t("modelNote"))}</p>`;
+    }
+    const listed = (e.features && e.features.listed) || [];
+    if (listed.length) {
+      html += `<div class="note">${esc(t("dListed"))}</div><ul class="consistent">` +
+        listed.map((l) => `<li>${fmtNum(l.khz, 1)} kHz: ${esc(l.label || l.mode)} <span class="muted">(${esc(l.source)})</span></li>`).join("") +
+        `</ul><p class="note">${esc(t("listedNote"))}</p>`;
+    }
+    html += procHtml(e);
+    html += `<div class="note">${esc(t("dText"))}</div><div class="textbox">${text ? textHtml(text) : '<span class="muted">' + esc(t("dNoText")) + "</span>"}</div>`;
+  }
+  const mode = box.dataset.mode || "USB";
+  html += `<div class="listen">
+      <label>${esc(t("mode"))}<select id="dMode">${["USB", "LSB", "CW", "AM"].map((m) => `<option ${m === mode ? "selected" : ""}>${m}</option>`).join("")}</select></label>
+      <label>${esc(t("bandwidth"))}<input id="dBw" type="number" min="100" max="12000" step="100" value="${esc(box.dataset.bw || (mode === "CW" ? 500 : 3000))}"></label>
+      <button id="dListen" class="primary wide" ${can ? "" : "disabled"}>${esc(t("listen"))}</button>
+      <button id="dCentre" class="wide" ${can ? "" : "disabled"}>${esc(t("centre"))}</button>
+      <button id="dMarker" class="wide">${esc(myMarkerOf(mk) ? t("myEditThis") : t("mySave"))}</button>
+      <button id="dRecord" class="wide" ${state.canRecord && !(state.recording[rx] && state.recording[rx].active) ? "" : "disabled"} title="${esc(state.canRecord ? t("tasksHow") : t("recOff"))}">${esc(t("recordThis", 2, taskTitle(taskFor(e, mk))))}</button>
+    </div>
+    <p class="note">${esc(can ? t("listenNote") : playback ? t("playbackNoControl") : t("cannotControl"))}</p>`;
+  box.innerHTML = html;
+  $("dMode").onchange = () => { box.dataset.mode = $("dMode").value; if ($("dMode").value === "CW" && !box.dataset.bwSet) $("dBw").value = 500; };
+  $("dBw").onchange = () => { box.dataset.bw = $("dBw").value; box.dataset.bwSet = "1"; };
+  $("dListen").onclick = () => {
+    const m = $("dMode").value, bw = Number($("dBw").value) || 3000;
+    pending.listen = { f: fmtKhz(centre), m };
+    send(Object.assign({ cmd: "listen", rx, freq: centre, mode: m, bw }, mk ? { dial: 1 } : {}));
+  };
+  $("dRecord").onclick = () => startRecording(rx, taskFor(e, mk), centre, 120);
+  $("dMarker").onclick = () => { const mine = myMarkerOf(mk); if (mine) openMarker(mine); else openMarker(null, markerDefaults(e, free)); };
+  $("dCentre").onclick = () => { pending.tune = fmtKhz(centre); send({ cmd: "tune", rx, centre: Math.round(centre) }); };
+  const stop = $("dStop");
+  if (stop && e) stop.onclick = () => { stop.disabled = true; send({ cmd: "ignore", rx: e.rx, id: e.id }); };
+}
+
+// --------------------------------------------------------------- log ----
+// Decoded text as HTML: "[picture NAME]" (a received radiofax) becomes
+// the picture, linked to itself at full size.
+function textHtml(text) {
+  return esc(text).replace(/\[picture ([A-Za-z0-9._-]+)\]/g, (m, name) => `<a class="pic" href="/pictures/${name}" target="_blank" rel="noopener"><img src="/pictures/${name}" alt="${esc(t("picture"))}" loading="lazy"></a>`);
+}
+function logLine(d) {
+  const div = document.createElement("div");
+  div.innerHTML = `<span class="time">${fmtTime(d.utc)}</span> <span class="tag">${esc(d.decoder)}</span> ${fmtKhz(d.freq)} ${textHtml(d.text)}`;
+  return div;
+}
+function rerenderLog() {
+  const log = $("log");
+  log.innerHTML = "";
+  for (let i = state.decodes.length - 1; i >= 0 && log.childNodes.length < 1000; i--) log.appendChild(logLine(state.decodes[i]));
+  $("logEmpty").hidden = state.decodes.length > 0;
+}
+
+// ---------------------------------------------------------- messages ----
+const pending = {};
+function onMessage(m) {
+  if (m.type === "status") {
+    state.status = m;
+    if (m.settings) state.settings = m.settings;
+    // The language: the settings', else the system's (first visit).
+    let stored = null; try { stored = localStorage.getItem("hfc.lang"); } catch (e) { /* none */ }
+    const wanted = (m.settings && m.settings.language) || stored || m.system_language || lang;
+    if (wanted !== lang) setLanguage(wanted, false);
+    for (const r of m.receivers) {
+      const v = receiverView(r.rx);
+      Object.assign(v, { name: r.name, controllable: r.controllable, centre: r.centre, rate: r.rate });
+      renderRxTitle(v);
+    }
+    renderHead(); renderStatus(); renderDetails();
+  } else if (m.type === "emission") {
+    const k = key(m.rx, m.id), old = state.emissions.get(k);
+    if (old && old.event === "end" && m.event !== "end") return;  // a stale snapshot entry
+    if (old && old.label && !m.label) m.label = old.label;
+    if (old && old.features && !m.features) m.features = old.features;
+    state.emissions.set(k, m);
+    if (m.label && !state.labels.has(m.label)) { state.labels.add(m.label); renderChips(); }
+    if (state.emissions.size > 2000) {
+      let n = 0;
+      for (const [kk, e] of state.emissions) {
+        if (e.event !== "end" || kk === state.selectedKey) continue;
+        state.emissions.delete(kk); state.texts.delete(kk);
+        if (++n >= 200) break;
+      }
+    }
+    drawLane(state.receivers[m.rx]);
+    renderTableSoon();
+    if (k === state.selectedKey) renderDetailsSoon();
+  } else if (m.type === "decode") {
+    const k = key(m.rx, m.id), dk = k + "|" + m.utc + "|" + m.decoder + "|" + m.text;
+    if (state.seenDecodes.has(dk)) return;
+    state.seenDecodes.add(dk);
+    if (state.seenDecodes.size > 5000) state.seenDecodes = new Set(Array.from(state.seenDecodes).slice(-2500));
+    state.texts.set(k, ((state.texts.get(k) || "") + " " + m.text).trim());
+    const e = state.emissions.get(k);
+    if (e && !e.label && m.first) { e.label = m.decoder; drawLane(state.receivers[m.rx]); }
+    if (!state.labels.has(m.decoder)) { state.labels.add(m.decoder); renderChips(); }
+    state.decodes.push(m);
+    if (state.decodes.length > 1500) state.decodes.splice(0, 500);
+    const log = $("log");
+    log.insertBefore(logLine(m), log.firstChild);
+    while (log.childNodes.length > 1000) log.removeChild(log.lastChild);
+    $("logEmpty").hidden = true;
+    renderTableSoon();
+    if (k === state.selectedKey) renderDetailsSoon();
+  } else if (m.type === "recording") {
+    const was = state.recording[m.rx];
+    state.recording[m.rx] = m;
+    renderRec(state.receivers[m.rx]);
+    if (was && was.active && !m.active) {
+      const file = String(m.file || "").split(/[\\/]/).pop();
+      toast(t("rec_" + (m.ended || "done"), file), m.ended === "cannot_write");
+      loadTasks(); renderDetails();
+    } else if (!was || was.active !== m.active) renderDetails();
+  } else if (m.type === "download") {
+    state.download = m;
+    if ($("dbDlg").open) renderDb();
+  } else if (m.type === "diagnostics") {
+    onDiagnostics(m);
+  } else if (m.type === "my_markers") {
+    loadMyMarkers();
+    loadWindows();  // a marker's decoder is a window too (and lists are read again)
+  } else if (m.type === "windows") {
+    loadWindows();
+  } else if (m.type === "usage") {
+    onUsage(m);
+  } else if (m.type === "databases") {
+    state.databases = m;
+    Object.values(state.receivers).forEach(loadMarkers);
+    loadTasks();
+    if ($("dbDlg").open) renderDb();
+  } else if (m.type === "result") {
+    if (m.ok) {
+      if (m.cmd === "record" && pending.record) { pending.record = false; toast(t("r_record")); }
+      else if ((m.cmd === "marker_save" || m.cmd === "marker_delete") && markerSaving) {
+        toast(t(markerSaving === "delete" ? "r_markerDel" : "r_marker")); markerSaving = null; $("markerDlg").close();
+      }
+      else if (m.cmd === "reload_databases") { toast(t("r_reload")); loadWindows(); }
+      else if ((m.cmd === "window_save" || m.cmd === "window_delete") && winSaving) {
+        toast(t(winSaving === "delete" ? "r_winDel" : "r_win")); winSaving = null; $("winDlg").close();
+      }
+      else if (m.cmd === "ignore") toast(t("r_stopped"));
+      else
+if (m.cmd === "listen" && pending.listen) toast(t("r_listen", pending.listen.f, pending.listen.m));
+      else if (m.cmd === "tune" && pending.tune) toast(t("r_tune", pending.tune));
+      else if (m.cmd === "settings" && settingsSaving) { settingsSaving = false; $("settingsDlg").close(); toast(restartNeeded ? t("r_settingsRestart") : t("r_settings")); }
+    } else {
+      const [code, detail] = String(m.message || "").split(/:(.*)/s);
+      const text = L()["e_" + code] !== undefined ? t("e_" + code, detail) : t("e_generic");
+      if ((m.cmd === "marker_save" || m.cmd === "marker_delete") && markerSaving) { markerSaving = null; $("markerErr").textContent = text; }
+      else if ((m.cmd === "window_save" || m.cmd === "window_delete") && winSaving) { winSaving = null; $("winErr").textContent = text; }
+      else if (m.cmd === "settings" && settingsSaving) { settingsSaving = false; $("settingsErr").textContent = text; }
+      else if (m.cmd === "diagnostics") { diag = { state: "failed", message: text, lines: [] }; renderDiag(); }
+      else toast(text, true);
+    }
+  }
+}
+let detailsTimer = null;
+function renderDetailsSoon() { if (!detailsTimer) detailsTimer = setTimeout(() => { detailsTimer = null; renderDetails(); }, 400); }
+
+let toastTimer = null;
+function toast(text, bad) {
+  const el = $("toast");
+  el.textContent = text; el.className = "show" + (bad ? " bad" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (el.className = ""), 4500);
+}
+
+// -------------------------------------------------- diagnostic report ----
+let diag = null;  // { state: running | done | failed, lines, file, path, message }
+function openDiag() {
+  if ($("settingsDlg").open) $("settingsDlg").close();
+  renderDiag();
+  $("diagDlg").showModal();
+}
+function onDiagnostics(m) {
+  if (m.state === "running") diag = { state: "running", lines: [] };
+  else if (m.state === "line") { if (!diag) diag = { state: "running", lines: [] }; diag.lines.push(m.line); }
+  else if (m.state === "done") diag = Object.assign(diag || { lines: [] }, { state: "done", file: m.file, path: m.path });
+  else if (m.state === "failed") diag = Object.assign(diag || { lines: [] }, { state: "failed", message: m.message });
+  if ($("diagDlg").open) renderDiag();
+}
+function renderDiag() {
+  const running = diag && diag.state === "running";
+  $("diagMake").disabled = running;
+  $("diagRates").disabled = running || !(state.status && state.status.mode === "live");
+  const log = $("diagLog");
+  log.hidden = !diag || !diag.lines.length;
+  if (diag) { log.textContent = diag.lines.join("\n"); log.scrollTop = log.scrollHeight; }
+  const r = $("diagResult");
+  $("diagFolder").hidden = !diag || diag.state !== "done";
+  if (!diag) r.innerHTML = "";
+  else if (running) r.innerHTML = `<p>${esc(t("diagRunning"))}</p>`;
+  else if (diag.state === "done")
+    r.innerHTML = `<p>${esc(t("diagDone"))}</p><p class="mono">${esc(diag.path || "")}</p>` +
+      `<p><a class="primary" href="/reports/${encodeURIComponent(diag.file)}" download><button class="primary" tabindex="-1">${esc(t("diagDownload"))}</button></a></p>`;
+  else r.innerHTML = `<p class="formerr">${esc(t("diagFailed", diag.message || ""))}</p>`;
+}
+$("openDiag").onclick = openDiag;
+$("closeDiag").onclick = () => $("diagDlg").close();
+$("diagFolder").onclick = () => send({ cmd: "open_folder", which: "reports" });
+$("diagMake").onclick = () => {
+  diag = { state: "running", lines: [] };
+  renderDiag();
+  send({ cmd: "diagnostics", rates: $("diagRates").checked ? "1" : "0" });
+};
+
+// ---------------------------------------------------------- settings ----
+let settingsSaving = false, restartNeeded = false;
+function openSettings(section) {
+  const s = state.settings;
+  if (!s) return;
+  const f = $("settingsForm");
+  f.max_sessions.value = s.max_sessions ?? 48; f.give_up_seconds.value = s.give_up_seconds ?? 120; f.min_snr_db.value = s.min_snr_db ?? 0;
+  f.measure_unknown.checked = s.measure_unknown !== false;
+  const off = new Set(String(s.disabled_decoders || "").split(",").filter((x) => x));
+  $("sFamilies").innerHTML = FAMILIES.map((fam) => `<label><input type="checkbox" data-fam="${esc(fam)}" ${off.has(fam) ? "" : "checked"}> ${esc(fam)}</label>`).join("");
+  f.language.value = s.language || "";
+  f.sdr_host.value = s.sdr_host; f.sdr_port.value = s.sdr_port; f.tuner.value = s.tuner; f.dual_serial.value = s.dual_serial;
+  f.start_headless.checked = s.start_headless; f.headless_path.value = s.headless_path;
+  f.open_window.checked = s.open_window; f.ft8.checked = s.ft8; f.http_port.value = s.http_port;
+  $("sdrSettings").disabled = state.status && state.status.mode === "playback";
+  $("logPath").textContent = (state.status && state.status.log) || "";
+  $("settingsErr").textContent = "";
+  renderWindowList();
+  $("settingsDlg").showModal();
+  if (section === "processing") $("procSettings").scrollIntoView({ block: "start" });
+}
+$("settingsForm").addEventListener("submit", (ev) => {
+  if (ev.submitter && ev.submitter.value !== "save") return;
+  ev.preventDefault();
+  const f = $("settingsForm"), s = state.settings || {};
+  const cmd = { cmd: "settings", language: f.language.value, sdr_host: f.sdr_host.value.trim(), sdr_port: String(f.sdr_port.value),
+    tuner: f.tuner.value, dual_serial: f.dual_serial.value.trim(), start_headless: f.start_headless.checked,
+    headless_path: f.headless_path.value.trim(), open_window: f.open_window.checked, ft8: f.ft8.checked, http_port: String(f.http_port.value),
+    // Processing: in effect as soon as saved, without a restart.
+    max_sessions: String(f.max_sessions.value), give_up_seconds: String(f.give_up_seconds.value), min_snr_db: String(f.min_snr_db.value),
+    measure_unknown: f.measure_unknown.checked,
+    disabled_decoders: [...$("sFamilies").querySelectorAll("[data-fam]")].filter((x) => !x.checked).map((x) => x.dataset.fam).join(",") };
+  restartNeeded = cmd.ft8 !== s.ft8 || Number(cmd.http_port) !== s.http_port;
+  // Only what was changed: the rest stays as in the settings file (which
+  // may differ from what this run uses, given options on its command line).
+  for (const k of Object.keys(cmd)) if (k !== "cmd" && String(cmd[k]) === String(s[k] ?? "")) delete cmd[k];
+  settingsSaving = true;
+  $("settingsErr").textContent = "";
+  send(cmd);
+  if (f.language.value) setLanguage(f.language.value, false);
+  else { try { localStorage.removeItem("hfc.lang"); } catch (e) { /* none */ } setLanguage((state.status && state.status.system_language) || lang, false); }
+});
+
+// --------------------------------------------------------------- wiring --
+$("lang").onchange = () => setLanguage($("lang").value, true);
+$("openSettings").onclick = () => openSettings();
+$("openHelp").onclick = () => $("helpDlg").showModal();
+$("closeHelp").onclick = () => $("helpDlg").close();
+$("export").onclick = () => { updateExport(); $("exportDlg").showModal(); };
+$("closeExport").onclick = () => $("exportDlg").close();
+$("fText").addEventListener("input", () => { renderTable(); updateExport(); });
+$("fActive").addEventListener("change", renderTable);
+$("searchLog").onclick = async () => {
+  if (state.mode === "search") { state.mode = "live"; renderTable(); return; }
+  const q = queryString();
+  const res = await fetch("/api/emissions?limit=2000" + (q ? "&" + q : ""));
+  state.searchRows = (await res.json()).map((e) => Object.assign(e, { event: e.ended ? "end" : "update" }));
+  state.mode = "search"; renderTable();
+};
+
+let ws = null, connectedToProgram = false;
+function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => {
+    connectedToProgram = true;
+    // The program sends what is on the air and the recent decodes again.
+    state.emissions.clear(); state.texts.clear(); state.seenDecodes.clear(); state.decodes = [];
+    rerenderLog(); Object.values(state.receivers).forEach(drawLane); renderTable(); renderStatus();
+  };
+  ws.onclose = () => { connectedToProgram = false; renderStatus(); setTimeout(connect, 2000); };
+  ws.onmessage = (ev) => { if (typeof ev.data === "string") onMessage(JSON.parse(ev.data)); else waterfall(ev.data); };
+}
+
+lang = initialLanguage();
+applyTexts();
+updateExport();
+loadDatabases();
+loadTasks();
+loadMyMarkers();
+loadWindows();
+connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+name: ci
+
+# To keep Actions minutes down, a push runs only the Linux build and tests
+# (about 5 minutes); the sanitizers (about 30) and Windows (MSVC, the
+# installer and its silent install; billed at twice the rate) run when
+# started by hand with "full" or "release", and on a version tag. A push
+# that changes only documentation runs nothing. A newer push cancels the
+# run of an older one on the same branch; a run started by hand is never
+# cancelled.
+on:
+  push:
+    paths-ignore: ["**.md", "docs/**"]
+  pull_request:
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Also the sanitizers and Windows (MSVC, installer, silent install)"
+        type: boolean
+        default: false
+      release:
+        description: "Publish this commit as the GitHub release of its version (creates the tag vX.Y.Z); runs everything first"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  linux:
+    name: Core, tools and tests (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: The installer script is UTF-8 with its byte order mark
+        # Without the mark makensis on Windows reads the system's ANSI code
+        # page, and the Bulgarian texts come out as garbage.
+        run: |
+          test "$(head -c 3 installer/setup.nsi | od -An -tx1 | tr -d ' ')" = "efbbbf"
+          python3 -c "open('installer/setup.nsi', encoding='utf-8-sig').read()"
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --timeout 300
+      - name: Probe and recorder against the fake SDRconnect
+        run: |
+          build/fake_sdrconnect --port 15454 --tone 30000:-20 --report-delay 0.2 &
+          # This one leaves out 0.6 s of IQ, once.
+          build/fake_sdrconnect --port 15455 --tone 30000:-20 --report-delay 0.2 --drop-after 1.5 --drop 0.6 &
+          sleep 1
+          build/sdrc_probe --port 15454 --seconds 1 --rates 250000,3000000,1000000 --dual 1806030000 --out probe.json
+          grep -q '"api_version": "1.0.3"' probe.json
+          grep -q '"accepted": false' probe.json   # 3 MS/s refused
+          build/sdrc_record --port 15455 -o rec --seconds 4
+          grep -q '"core:datatype": "ci16_le"' rec.sigmf-meta
+          grep -q '"core:label": "gap"' rec.sigmf-meta
+          kill %1 %2
+      - name: Classifier playback of the synthetic scene
+        run: |
+          build/make_test_scene scene
+          build/hf_classifier --play scene.sigmf-meta --speed 0 --exit --db scene.db --http 0
+          python3 - <<'PY'
+          import sqlite3
+          c = sqlite3.connect("scene.db")
+          labels = {r[0] for r in c.execute("select label from emissions where label <> ''")}
+          print(sorted(labels))
+          want = {"NAVTEX", "RTTY 45.45/170", "CW", "PSK31", "ALE 2G", "FT8", "FT4"}
+          assert want <= labels, want - labels
+          PY
+
+  sanitizers:
+    name: Tests under ThreadSanitizer and AddressSanitizer
+    if: (github.event_name == 'workflow_dispatch' && (inputs.full || inputs.release)) || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: ThreadSanitizer
+        run: |
+          cmake -S . -B tsan -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS="-fsanitize=thread -g" -DHFC_BUILD_TOOLS=OFF
+          cmake --build tsan -j
+          TSAN_OPTIONS=halt_on_error=1 tsan/hfc_tests
+      - name: AddressSanitizer + UndefinedBehaviorSanitizer
+        run: |
+          cmake -S . -B asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" -DHFC_BUILD_TOOLS=OFF
+          cmake --build asan -j
+          UBSAN_OPTIONS=halt_on_error=1 asan/hfc_tests
+
+  windows:
+    name: Core, tools, tests and installer (Windows, MSVC)
+    if: (github.event_name == 'workflow_dispatch' && (inputs.full || inputs.release)) || startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: NSIS
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue) -and
+              -not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) { choco install nsis -y --no-progress }
+      - name: Configure
+        run: cmake -S . -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release -j
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 300
+      - name: Classifier playback of the synthetic scene
+        run: |
+          build/Release/make_test_scene.exe scene
+          build/Release/hf_classifier.exe --play scene.sigmf-meta --speed 0 --exit --db scene.db --http 0
+      - name: Installer
+        run: cmake --build build --config Release --target installer
+      - name: Silent install, run the installed program, uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = (Get-ChildItem build\HFClassifier_Setup_*.exe | Select-Object -First 1).FullName
+          Start-Process $setup -ArgumentList "/S", "/DESKTOP=1", "/AUTOSTART=1" -Wait
+          $dir = "$env:ProgramFiles\HF Classifier"
+          $menu = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs"
+          foreach ($f in "$dir\HFClassifier.exe", "$dir\hf_classifier.exe", "$dir\sdrc_probe.exe", "$dir\sdrc_record.exe",
+                         "$dir\README.txt", "$dir\THIRD_PARTY_NOTICES.txt", "$dir\Uninstall.exe",
+                         "$menu\HF Classifier.lnk", "$menu\HF Classifier demo.lnk", "$menu\HF Classifier diagnostic report.lnk",
+                         "$menu\StartUp\HF Classifier.lnk", "$env:PUBLIC\Desktop\HF Classifier.lnk",
+                         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HFClassifier") {
+            if (-not (Test-Path $f)) { throw "missing after install: $f" }
+          }
+          # A diagnostic report from the installed program, with a stand-in
+          # SDRconnect answering: Windows, SDRconnect's state, the measuring.
+          $fake = Start-Process build\Release\fake_sdrconnect.exe -PassThru -ArgumentList "--port", "15470", "--tone", "30000:-20"
+          Start-Sleep 1
+          & "$dir\hf_classifier.exe" --report --port 15470 --http 0
+          if ($LASTEXITCODE -ne 0) { throw "hf_classifier.exe --report: $LASTEXITCODE" }
+          $fake.Kill()
+          $reports = "$env:LOCALAPPDATA\HF Classifier\reports"
+          $zip = (Get-ChildItem "$reports\hfc_report_*.zip" | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
+          python -c "import json, sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; r = json.loads(z.read('report.json')); print(r['system'], r['sdrconnect']); assert r['system']['os'].startswith('Windows 10.0 build'); assert r['probe']['properties']['api_version'] == '1.0.3'; assert r['sdrconnect']['sdrconnect_running'] == 'no'" "$zip"
+          # The demo runs from the installed program, with its own log.
+          & "$dir\hf_classifier.exe" --demo --speed 4 --exit --db demo.db --http 0
+          if ($LASTEXITCODE -ne 0) { throw "hf_classifier.exe --demo: $LASTEXITCODE" }
+          python -c "import sqlite3; c = sqlite3.connect('demo.db'); n = {r[0] for r in c.execute('select decoder from decodes')}; print(sorted(n)); assert {'NAVTEX', 'DSC', 'Akula', 'FT8'} <= n"
+          # The installed console program plays the scene.
+          & "$dir\hf_classifier.exe" --play scene.sigmf-meta --speed 0 --exit --db installed.db --http 0
+          if ($LASTEXITCODE -ne 0) { throw "hf_classifier.exe: $LASTEXITCODE" }
+          # The installed program for everyday use (no console) plays it too.
+          $p = Start-Process "$dir\HFClassifier.exe" -PassThru -ArgumentList "--play", "`"$PWD\scene.sigmf-meta`"",
+                 "--speed", "0", "--exit", "--db", "`"$PWD\tray.db`"", "--http", "0", "--no-open"
+          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw "HFClassifier.exe did not finish" }
+          if ($p.ExitCode -ne 0) { throw "HFClassifier.exe: $($p.ExitCode)" }
+          $log = Get-Content "$env:LOCALAPPDATA\HF Classifier\hf_classifier.log" -Raw
+          Write-Output $log
+          if ($log -notmatch "playback done") { throw "HFClassifier.exe log: no playback" }
+          python -c "import sqlite3; c = sqlite3.connect('tray.db'); n = c.execute('select count(*) from emissions where length(label) > 0').fetchone()[0]; print(n, 'decoded'); assert n >= 7"
+          # Running live (nothing answers), it is closed by the uninstaller,
+          # run in place (_?=) so that it can be waited for.
+          $p = Start-Process "$dir\HFClassifier.exe" -PassThru -ArgumentList "--no-headless", "--port", "1", "--http", "18073", "--no-open"
+          Start-Sleep 3
+          if ($p.HasExited) { throw "HFClassifier.exe stopped: $($p.ExitCode)" }
+          # The playback run's log is kept as the previous one.
+          $prev = Get-Content "$env:LOCALAPPDATA\HF Classifier\hf_classifier.previous.log" -Raw
+          if ($prev -notmatch "playback done") { throw "hf_classifier.previous.log: not the playback run's" }
+          # Its log file has its messages while it runs (a user's report, and
+          # this check before, found it empty).
+          $cur = Get-Content "$env:LOCALAPPDATA\HF Classifier\hf_classifier.log" -Raw
+          if (-not $cur -or $cur -notmatch "SDRconnect") { throw "hf_classifier.log is empty while HFClassifier.exe runs" }
+          # Asked for a report, the running program makes it (nothing answers
+          # at port 1, so it says why it measured nothing).
+          & "$dir\hf_classifier.exe" --report --http 18073
+          if ($LASTEXITCODE -ne 0) { throw "hf_classifier.exe --report (program running): $LASTEXITCODE" }
+          $zip = (Get-ChildItem "$reports\hfc_report_*.zip" | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
+          python -c "import json, sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); r = json.loads(z.read('report.json')); print(r['mode'], r['probe']); assert r['mode'] == 'live'; assert r['probe']['skipped'].startswith('not_connected'); assert len(z.read('hf_classifier.log')) > 0, 'the running program log is empty in the report'" "$zip"
+          Start-Process "$dir\Uninstall.exe" -ArgumentList "/S", "_?=$dir" -Wait
+          if (-not $p.WaitForExit(15000)) { throw "the uninstaller did not close HFClassifier.exe" }
+          foreach ($f in "$dir\HFClassifier.exe", "$dir\hf_classifier.exe", "$menu\HF Classifier.lnk", "$menu\HF Classifier demo.lnk",
+                         "$menu\HF Classifier diagnostic report.lnk",
+                         "$menu\StartUp\HF Classifier.lnk", "$env:PUBLIC\Desktop\HF Classifier.lnk",
+                         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HFClassifier") {
+            if (Test-Path $f) { throw "left after uninstall: $f" }
+          }
+          if (-not (Test-Path "$env:LOCALAPPDATA\HF Classifier\hf_classifier.log")) { throw "the user's data was removed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdrconnect-classifier-windows-x64
+          path: |
+            build/HFClassifier_Setup_*.exe
+            build/Release/HFClassifier.exe
+            build/Release/hf_classifier.exe
+            build/Release/make_test_scene.exe
+            build/Release/sdrc_probe.exe
+            build/Release/sdrc_record.exe
+            build/Release/fake_sdrconnect.exe
+
+  release:
+    name: GitHub release (on a version tag, or asked for when started by hand)
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+    needs: [linux, sanitizers, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdrconnect-classifier-windows-x64
+          path: dist
+      - name: Publish the release with the tested installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.ref }}
+        run: |
+          # Started by a tag: it must be the version in CMakeLists.txt.
+          # Started by hand: the release creates the tag on this commit.
+          version="$(sed -n 's/^project(sdrconnect_classifier VERSION \([0-9.]*\) .*/\1/p' CMakeLists.txt)"
+          test -n "$version" || { echo "no version in CMakeLists.txt"; exit 1; }
+          TAG="v${version}"
+          case "$REF" in
+            refs/tags/*) test "$REF" = "refs/tags/$TAG" || { echo "tag $REF does not match version $version"; exit 1; } ;;
+          esac
+          installer="$(find dist -name "HFClassifier_Setup_${version}.exe" | head -1)"
+          test -n "$installer" || { echo "no installer for $version in the artifact"; exit 1; }
+          # The notes: this version's section of CHANGELOG.md.
+          awk -v v="$version" '/^## /{p = index($0, "## " v " ") == 1; next} p' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "no CHANGELOG.md section for $version"; exit 1; }
+          title="$(grep -m1 "^## ${version} " CHANGELOG.md | sed 's/^## //')"
+          prerelease=""
+          case "$version" in 0.*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" "$installer" --title "$title" --notes-file notes.md $prerelease --target "$GITHUB_SHA"

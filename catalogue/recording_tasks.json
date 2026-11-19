@@ -1,0 +1,477 @@
+{
+ "about": "Recordings that would help: what the Recording tasks panel shows. 'modes' are names of catalogue/modes.json; frequencies come from the loaded frequency lists (entries whose mode is one of 'modes', or whose label has one of the words in 'find'), never from here. Groups: check = decoded, to confirm on a real receiver; structure = recognised by structure, independent recordings test it; learn = only classified, recordings are needed to tell it from its look-alikes; nospec = no public specification; planned = a decoder is planned; unknown = whatever stays unidentified. Source of the list: docs/RESEARCH.md section 3.5.",
+ "tasks": [
+  {
+   "id": "navtex",
+   "group": "check",
+   "title": "NAVTEX / SITOR-B",
+   "modes": [
+    "NAVTEX / SITOR-B"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 300
+  },
+  {
+   "id": "dsc",
+   "group": "check",
+   "title": "GMDSS DSC",
+   "modes": [
+    "DSC-HF"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 300
+  },
+  {
+   "id": "rtty",
+   "group": "check",
+   "title": "RTTY (weather and press teletype)",
+   "modes": [
+    "RTTY 50/450",
+    "RTTY 45.45/170",
+    "RTTY (other rates and shifts)"
+   ],
+   "find": [
+    "teletype"
+   ],
+   "want": 2,
+   "seconds": 120
+  },
+  {
+   "id": "cw",
+   "group": "check",
+   "title": "Morse (CW) stations and beacons",
+   "modes": [
+    "CW"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 120
+  },
+  {
+   "id": "ale2g",
+   "group": "check",
+   "title": "ALE 2G (MIL-STD-188-141A)",
+   "modes": [
+    "ALE 2G"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 300
+  },
+  {
+   "id": "ale3g",
+   "group": "check",
+   "title": "ALE 3G / 4G",
+   "modes": [
+    "ALE 3G / 4G (WALE)"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 300
+  },
+  {
+   "id": "ft8",
+   "group": "check",
+   "title": "FT8 / FT4",
+   "modes": [
+    "FT8",
+    "FT4"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 120
+  },
+  {
+   "id": "psk",
+   "group": "check",
+   "title": "PSK31 and faster",
+   "modes": [
+    "PSK31",
+    "PSK63",
+    "PSK125",
+    "PSK250",
+    "PSK500",
+    "QPSK31",
+    "QPSK63",
+    "QPSK125",
+    "QPSK250",
+    "QPSK500"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 120
+  },
+  {
+   "id": "akula",
+   "group": "structure",
+   "title": "Akula",
+   "modes": [
+    "Akula"
+   ],
+   "find": [],
+   "want": 5,
+   "seconds": 120
+  },
+  {
+   "id": "t600",
+   "group": "structure",
+   "title": "CIS-36-50 / CIS-50-50 (T-600)",
+   "modes": [
+    "CIS-36-50 (T-600)",
+    "CIS-50-50"
+   ],
+   "find": [],
+   "want": 5,
+   "seconds": 120
+  },
+  {
+   "id": "stanag4285",
+   "group": "learn",
+   "title": "STANAG 4285",
+   "modes": [
+    "STANAG 4285"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "stanag4529",
+   "group": "learn",
+   "title": "STANAG 4529",
+   "modes": [
+    "STANAG 4529"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "stanag4539",
+   "group": "learn",
+   "title": "STANAG 4539 / MIL-STD-188-110 App C",
+   "modes": [
+    "STANAG 4539 / MIL-STD-188-110 App C"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "110a",
+   "group": "learn",
+   "title": "MIL-STD-188-110A serial / STANAG 4415",
+   "modes": [
+    "MIL-STD-188-110 serial / STANAG 4415"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "110-16tone",
+   "group": "learn",
+   "title": "MIL-STD-188-110 App A (16-tone)",
+   "modes": [
+    "MIL-STD-188-110 App A (16-tone)"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "110-39tone",
+   "group": "learn",
+   "title": "MIL-STD-188-110 App B (39-tone) / STANAG 4197",
+   "modes": [
+    "MIL-STD-188-110 App B (39-tone) / STANAG 4197"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "link11",
+   "group": "learn",
+   "title": "Link-11 (CLEW and SLEW)",
+   "modes": [
+    "Link-11 CLEW",
+    "Link-11 SLEW"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "cis12",
+   "group": "learn",
+   "title": "CIS-12",
+   "modes": [
+    "CIS-12"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "cis1200",
+   "group": "learn",
+   "title": "CIS BPSK 1200",
+   "modes": [
+    "CIS BPSK 1200"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "xpa2",
+   "group": "learn",
+   "title": "CIS MFSK-16 (XPA2)",
+   "modes": [
+    "CIS MFSK-16 (XPA2)"
+   ],
+   "find": [
+    "xpa",
+    "xpb"
+   ],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "crowd36",
+   "group": "learn",
+   "title": "CROWD36 (CIS-36 MFSK)",
+   "modes": [
+    "CROWD36 (CIS-36 MFSK)"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "cis20",
+   "group": "learn",
+   "title": "CIS-20",
+   "modes": [
+    "CIS-20"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "serdolik",
+   "group": "learn",
+   "title": "Serdolik",
+   "modes": [
+    "Serdolik (command state)"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "codan",
+   "group": "learn",
+   "title": "CODAN (Selcal, 3212, chirp, 9001)",
+   "modes": [
+    "CODAN Selcal",
+    "CODAN 3212",
+    "CODAN chirp (ALE)",
+    "CODAN 9001"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "pactor",
+   "group": "learn",
+   "title": "PACTOR I / II / III",
+   "modes": [
+    "PACTOR I",
+    "PACTOR II",
+    "PACTOR III"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "sitor-a",
+   "group": "learn",
+   "title": "SITOR-A",
+   "modes": [
+    "SITOR-A"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "f11",
+   "group": "learn",
+   "title": "Polish F11",
+   "modes": [
+    "Polish F11"
+   ],
+   "find": [
+    "pol-arq"
+   ],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "chinese44",
+   "group": "learn",
+   "title": "Chinese 4+4",
+   "modes": [
+    "Chinese 4+4"
+   ],
+   "find": [
+    "4+4"
+   ],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "cis112",
+   "group": "nospec",
+   "title": "CIS-112",
+   "modes": [
+    "CIS-112"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "cis3000",
+   "group": "nospec",
+   "title": "CIS-3000",
+   "modes": [
+    "CIS-3000"
+   ],
+   "find": [],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "cis75",
+   "group": "nospec",
+   "title": "CIS-75 FSK",
+   "modes": [],
+   "find": [
+    "cis-75"
+   ],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "chn2400",
+   "group": "nospec",
+   "title": "Chinese pi/2-BPSK 2400 and MIL 8PSK 1627",
+   "modes": [],
+   "find": [
+    "chn mil",
+    "chinese mil"
+   ],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "tur600",
+   "group": "nospec",
+   "title": "Turkish Navy FSK 600 Bd",
+   "modes": [],
+   "find": [
+    "turkish navy"
+   ],
+   "want": 3,
+   "seconds": 120
+  },
+  {
+   "id": "hfdl",
+   "group": "check",
+   "title": "HFDL (aircraft data link)",
+   "modes": [
+    "HFDL"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 300
+  },
+  {
+   "id": "fax",
+   "group": "check",
+   "title": "Weather fax (WEFAX)",
+   "modes": [
+    "Radiofax (WEFAX)"
+   ],
+   "find": [
+    "fax",
+    "wefax"
+   ],
+   "want": 2,
+   "seconds": 600
+  },
+  {
+   "id": "sstv",
+   "group": "check",
+   "title": "SSTV",
+   "modes": [
+    "SSTV"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 120
+  },
+  {
+   "id": "wspr",
+   "group": "check",
+   "title": "WSPR",
+   "modes": [
+    "WSPR"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 240
+  },
+  {
+   "id": "drm",
+   "group": "check",
+   "title": "DRM broadcast",
+   "modes": [
+    "DRM"
+   ],
+   "find": [],
+   "want": 2,
+   "seconds": 120
+  },
+  {
+   "id": "time",
+   "group": "check",
+   "title": "Time signal stations",
+   "modes": [
+    "Time signal"
+   ],
+   "find": [
+    "time signal"
+   ],
+   "want": 2,
+   "seconds": 120
+  },
+  {
+   "id": "unknown",
+   "group": "unknown",
+   "title": "Anything the program cannot name",
+   "modes": [],
+   "find": [],
+   "want": 10,
+   "seconds": 120
+  }
+ ]
+}

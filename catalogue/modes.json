@@ -1,0 +1,606 @@
+{
+  "about": "Catalogue v1 of the modes the classifier decodes or will classify: the amateur and maritime/aeronautical modes with public specifications, and the military and government modems of docs/RESEARCH.md section 3 with the parameters the program can measure (their sync patterns are still only in docs/RESEARCH.md; frame periods are in 'frame_ms'). JSON, which is also valid YAML 1.2. Each parameter carries its provenance: 'documented' = from the cited specification, 'observed' = measured on recordings by someone, cited; 'guess' = not established. The 'match' blocks are read by the program (core/src/catalogue.cpp): the measured features of an emission no decoder recognised are compared with them, and the modes they are consistent with are listed. That is not an identification: many modes share parameters. 'in_program' says what the program does with the mode today and how that was tested. Provenance of 'match' parameters: 'documented' (the specification), 'vendor' (a decoder vendor's documentation, e.g. Wavecom), 'observed' (analysts, e.g. sigidwiki), 'measured' (in this project, on recordings supplied for it), 'guess'. A block's 'frame_provenance' and 'frame_source', when given, are those of its 'frame_ms'.",
+  "version": 1,
+  "sources": {
+    "QEX2020": "S. Franke, B. Somerville, J. Taylor, 'The FT4 and FT8 Communication Protocols', QEX July/August 2020",
+    "WSJTX": "WSJT-X User Guide (J. Taylor et al.), wsjt.sourceforge.io",
+    "WSPR": "J. Taylor, 'WSPR' protocol description in the WSJT-X User Guide and K1JT's WSPR documentation",
+    "JS8": "JS8Call documentation (J. Kesler, KN4CRD), js8call.com",
+    "G3PLX": "P. Martinez, G3PLX, 'PSK31: a new radio-teletype mode', RadCom Dec 1998/Jan 1999",
+    "FLDIGI": "fldigi (W1HKJ et al.) source code, src/psk/psk.cxx: symbol lengths at 8000 samples/s (256, 128, 64, 32, 16 for 31.25 to 500 Bd, BPSK and QPSK alike), QPSK's convolutional code (constraint length 5, polynomials 0x17 and 0x19) and the preamble and postamble; read as a reference, no code copied",
+    "ITA2": "ITU-T S.1 (International Telegraph Alphabet No. 2)",
+    "M476": "ITU-R M.476 and M.625 (direct-printing telegraph equipment, SITOR); ITU-R M.540 (NAVTEX)",
+    "M1677": "ITU-R M.1677 (International Morse code)",
+    "OLIVIA": "P. Jalocha, SP9VRC, Olivia MFSK description; fldigi documentation",
+    "MFSK": "M. Greenman, ZL1BPU, MFSK16 description; fldigi documentation",
+    "HELL": "fldigi documentation, Hellschreiber modes",
+    "MIL141": "MIL-STD-188-141B/D (ALE 2G appendix A, 3G appendix C, 4G appendix G); FED-STD-1045",
+    "DRM": "ETSI ES 201 980 (Digital Radio Mondiale)",
+    "ARDOP": "ARDOP specification (R. Muething, KN6KB)",
+    "VARA": "VARA HF documentation (J. A. Ruiz, EA5HVK); a proprietary modem",
+    "SSTV": "Dayton Paper (J. Langner, 'Proposal for SSTV Mode Specifications', 1998)",
+    "WAVECOM": "Wavecom decoder online help, mode pages (docs/RESEARCH.md source [11]); a decoder vendor's documentation, not the originators'",
+    "SIGIDWIKI": "Signal Identification Wiki, raw pages for each mode (docs/RESEARCH.md source [12]); analysts' observations",
+    "PRIYOM-T600": "Priyom.org, T-600 (docs/RESEARCH.md source [13])",
+    "PRIYOM-SERDOLIK": "Priyom.org, Serdolik 2018 (docs/RESEARCH.md source [14])",
+    "I56578": "i56578-swl blog posts on Akula and CIS Navy FSK (docs/RESEARCH.md sources [15], [35], [36], [37])",
+    "I56578-SCRAMBLER": "i56578-swl blog, 'STANAG 5511 Link-11 SLEW scrambler' (13 May 2016), quoting MIL-STD-188-110A: the data scrambler is reset after every 160 transmit symbols (docs/RESEARCH.md source [42])",
+    "RIVET": "Rivet source code, CIS3650.java (docs/RESEARCH.md source [38]); a hobbyist decoder",
+    "USER-SA": "Signals Analyzer screenshots supplied for the project (docs/RESEARCH.md source [39])",
+    "RESEARCH-3.6": "Measured in this project on recordings supplied for it (docs/RESEARCH.md section 3.6)",
+    "DUMPHFDL": "dumphfdl README (docs/RESEARCH.md source [21])"
+  },
+  "modes": [
+    {
+      "name": "FT8", "family": "amateur digital",
+      "modulation": "8-GFSK (BT 2.0)",
+      "baud": {"value": 6.25, "provenance": "documented", "source": "QEX2020"},
+      "tone_spacing_hz": {"value": 6.25, "provenance": "documented", "source": "QEX2020"},
+      "bandwidth_hz": {"value": 50, "provenance": "documented", "source": "QEX2020"},
+      "timing": {"value": "15 s UTC slots, 79 symbols = 12.64 s, starting 0.5 s into the slot", "provenance": "documented", "source": "QEX2020"},
+      "sync": {"value": "Costas 7x7 arrays at symbols 0, 36, 72", "provenance": "documented", "source": "QEX2020"},
+      "fec": "LDPC(174,91) with CRC-14",
+      "dial_frequencies_khz": {"value": [1840, 3573, 5357, 7074, 10136, 14074, 18100, 21074, 24915, 28074], "provenance": "guess", "note": "WSJT-X defaults as commonly listed; not checked against the WSJT-X source"},
+      "in_program": "decoded (ft8_lib) in the sub-band at each dial frequency inside the receiver's band; tested on synthetic signals only",
+      "match": [
+        {"modulation": "MFSK", "baud": [6.25], "tones": [8], "spacing_hz": [6.25], "provenance": "documented", "source": "QEX2020"}
+      ]
+    },
+    {
+      "name": "FT4", "family": "amateur digital",
+      "modulation": "4-GFSK (BT 1.0)",
+      "baud": {"value": 20.833, "provenance": "documented", "source": "QEX2020"},
+      "tone_spacing_hz": {"value": 20.833, "provenance": "documented", "source": "QEX2020"},
+      "bandwidth_hz": {"value": 83.3, "provenance": "documented", "source": "QEX2020"},
+      "timing": {"value": "7.5 s UTC slots, 105 symbols = 5.04 s", "provenance": "documented", "source": "QEX2020"},
+      "fec": "LDPC(174,91) with CRC-14",
+      "dial_frequencies_khz": {"value": [3575, 7047.5, 10140, 14080, 18104, 21140, 24919, 28180], "provenance": "guess", "note": "WSJT-X defaults as commonly listed; not checked against the WSJT-X source"},
+      "in_program": "decoded (ft8_lib) like FT8; tested on synthetic signals only",
+      "match": [
+        {"modulation": "MFSK", "baud": [20.833], "tones": [4], "spacing_hz": [20.833], "provenance": "documented", "source": "QEX2020"}
+      ]
+    },
+    {
+      "name": "WSPR", "family": "amateur beacon",
+      "modulation": "4-FSK",
+      "baud": {"value": 1.4648, "provenance": "documented", "source": "WSPR"},
+      "tone_spacing_hz": {"value": 1.4648, "provenance": "documented", "source": "WSPR"},
+      "bandwidth_hz": {"value": 6, "provenance": "documented", "source": "WSPR"},
+      "timing": {"value": "2-minute slots starting on even minutes, 162 symbols = 110.6 s", "provenance": "documented", "source": "WSPR"},
+      "in_program": "decoded (core/src/wspr.cpp) per 2-minute slot in the sub-band at each dial frequency inside the receiver's band: standard messages (callsign, 4-character locator, power) that pass every check and agree with 75 % of the received tones. Down to about -25 dB SNR in 2500 Hz on synthetic slots; both of the Signal Identification Wiki's recordings decode",
+      "match": [
+        {"modulation": "MFSK", "baud": [1.4648], "tones": [4], "spacing_hz": [1.4648], "provenance": "documented", "source": "WSPR"}
+      ]
+    },
+    {
+      "name": "JS8", "family": "amateur digital",
+      "modulation": "8-GFSK, the FT8 waveform with other framing",
+      "baud": {"value": 6.25, "provenance": "documented", "source": "JS8", "note": "'normal' speed; faster and slower submodes exist with other parameters"},
+      "bandwidth_hz": {"value": 50, "provenance": "documented", "source": "JS8", "note": "'normal' speed"},
+      "timing": {"value": "15 s slots ('normal' speed)", "provenance": "documented", "source": "JS8"},
+      "in_program": "not decoded: JS8 differs from FT8 in its sync arrays and message packing (JS8 documentation), so the FT8 decoder is not expected to decode it (not tested); not classified yet",
+      "match": [
+        {"modulation": "MFSK", "baud": [6.25], "tones": [8], "spacing_hz": [6.25], "provenance": "documented", "source": "JS8", "note": "'normal' speed"}
+      ]
+    },
+    {
+      "name": "PSK31", "family": "amateur digital",
+      "modulation": "BPSK, raised-cosine shaped, differential; Varicode",
+      "baud": {"value": 31.25, "provenance": "documented", "source": "G3PLX"},
+      "bandwidth_hz": {"value": 60, "provenance": "observed", "note": "the necessary bandwidth commonly given for PSK31 (emission designator 60H0J2B); not from G3PLX's article, which gives the baud rate"},
+      "in_program": "decoded (PSK decoder from sdr_plugin_psk) on emissions up to 250 Hz wide, or measured at 31.25 Bd, when the text reads like radio traffic; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [31.25], "provenance": "documented", "source": "G3PLX"}
+      ]
+    },
+    {
+      "name": "PSK63", "family": "amateur digital",
+      "modulation": "BPSK as PSK31, twice the rate",
+      "baud": {"value": 62.5, "provenance": "documented", "source": "FLDIGI", "note": "the rate as fldigi implements it; G3PLX's article gives PSK31's 31.25 Bd"},
+      "in_program": "decoded (same decoder) on emissions up to 250 Hz wide, or measured at 62.5 Bd; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [62.5], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "PSK125", "family": "amateur digital",
+      "modulation": "BPSK as PSK31, four times the rate",
+      "baud": {"value": 125, "provenance": "documented", "source": "FLDIGI", "note": "the rate as fldigi implements it"},
+      "in_program": "decoded (same decoder) on emissions 100-250 Hz wide, or measured at 125 Bd; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [125], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "PSK250", "family": "amateur digital",
+      "modulation": "BPSK as PSK31, eight times the rate",
+      "baud": {"value": 250, "provenance": "documented", "source": "FLDIGI"},
+      "in_program": "decoded (same decoder) on emissions 250-800 Hz wide, or measured at 250 Bd; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [250], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "PSK500", "family": "amateur digital",
+      "modulation": "BPSK as PSK31, sixteen times the rate",
+      "baud": {"value": 500, "provenance": "documented", "source": "FLDIGI"},
+      "in_program": "decoded (same decoder) on emissions 500-1250 Hz wide, or measured at 500 Bd; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [500], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "QPSK31", "family": "amateur digital",
+      "modulation": "differential QPSK, raised-cosine shaped; each Varicode bit through a rate 1/2, constraint length 5 convolutional code (polynomials 0x17, 0x19) as one of four phase changes",
+      "baud": {"value": 31.25, "provenance": "documented", "source": "FLDIGI"},
+      "fec": "convolutional, rate 1/2, K=5",
+      "in_program": "decoded (same decoder: soft-decision Viterbi, either sense of rotation) alongside PSK31; tested on synthetic signals and the sigidwiki's example recording. Shares every measured parameter with PSK31: the decoders tell them apart",
+      "match": [
+        {"modulation": "PSK", "baud": [31.25], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "QPSK63", "family": "amateur digital",
+      "modulation": "QPSK31 at twice the rate",
+      "baud": {"value": 62.5, "provenance": "documented", "source": "FLDIGI"},
+      "in_program": "decoded (same decoder) alongside PSK63; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [62.5], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "QPSK125", "family": "amateur digital",
+      "modulation": "QPSK31 at four times the rate",
+      "baud": {"value": 125, "provenance": "documented", "source": "FLDIGI"},
+      "in_program": "decoded (same decoder) alongside PSK125; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [125], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "QPSK250", "family": "amateur digital",
+      "modulation": "QPSK31 at eight times the rate",
+      "baud": {"value": 250, "provenance": "documented", "source": "FLDIGI"},
+      "in_program": "decoded (same decoder) alongside PSK250; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [250], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "QPSK500", "family": "amateur digital",
+      "modulation": "QPSK31 at sixteen times the rate",
+      "baud": {"value": 500, "provenance": "documented", "source": "FLDIGI"},
+      "in_program": "decoded (same decoder) alongside PSK500; tested on synthetic signals and the sigidwiki's example recording",
+      "match": [
+        {"modulation": "PSK", "baud": [500], "provenance": "documented", "source": "FLDIGI"}
+      ]
+    },
+    {
+      "name": "RTTY 45.45/170", "family": "amateur teleprinter",
+      "modulation": "2-FSK, ITA2 start/stop (1 start, 5 data, 1.5 stop bits)",
+      "baud": {"value": 45.45, "provenance": "observed", "note": "the amateur convention (60 words per minute); ITU-T S.1 defines the code, not this speed"},
+      "shift_hz": {"value": 170, "provenance": "observed", "note": "the amateur convention, not from ITU-T S.1"},
+      "in_program": "decoded (FSK decoder from sdr_plugin_navtex) on emissions 200-700 Hz wide when the text reads like radio traffic; tested on synthetic signals only",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [170], "baud": [45.45], "provenance": "documented", "source": "ITA2"}
+      ]
+    },
+    {
+      "name": "RTTY 50/450", "family": "weather and press teleprinter broadcasts",
+      "modulation": "2-FSK, ITA2 start/stop",
+      "baud": {"value": 50, "provenance": "observed", "note": "as listed for the German Weather Service's RTTY broadcasts by monitoring sites; not checked against the service's own schedule here"},
+      "shift_hz": {"value": 450, "provenance": "observed", "note": "as above"},
+      "in_program": "decoded (same decoder) on emissions 350-900 Hz wide when the text reads like radio or weather traffic; tested on synthetic signals only. Its two tones start together, so they are one emission",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [450], "baud": [50], "provenance": "documented", "source": "ITA2"}
+      ]
+    },
+    {
+      "name": "CW", "family": "Morse",
+      "modulation": "on-off keyed carrier",
+      "speed": {"value": "any; the decoder follows the speed", "provenance": "documented", "source": "M1677"},
+      "in_program": "decoded (Morse decoder from sdr_plugin_ook) on emissions up to 250 Hz wide (occupied bandwidth) when the text reads like radio traffic or code groups; tested on synthetic signals only. The first letter or so is lost while the emission is confirmed",
+      "match": [
+        {"modulation": "OOK", "provenance": "documented", "source": "M1677"}
+      ]
+    },
+    {
+      "name": "NAVTEX / SITOR-B", "family": "maritime safety information",
+      "modulation": "2-FSK, CCIR 476 7-bit code with time-diversity FEC (mode B)",
+      "baud": {"value": 100, "provenance": "documented", "source": "M476"},
+      "shift_hz": {"value": 170, "provenance": "documented", "source": "M476"},
+      "frequencies_khz": {"value": [490, 518, 4209.5], "provenance": "documented", "source": "M476", "note": "NAVTEX; SITOR-B is also used elsewhere"},
+      "in_program": "decoded (NAVTEX decoder from sdr_plugin_navtex, with the ZCZC/NNNN message layer) on emissions 200-700 Hz wide; tested on synthetic signals only",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [170], "baud": [100], "provenance": "documented", "source": "M476"}
+      ]
+    },
+    {
+      "name": "ALE 2G", "family": "automatic link establishment",
+      "modulation": "8-FSK, 125 Bd, tones 750-2500 Hz in 250 Hz steps; Golay(24,12) and triple redundancy",
+      "baud": {"value": 125, "provenance": "documented", "source": "MIL141"},
+      "bandwidth_hz": {"value": 2000, "provenance": "documented", "source": "MIL141", "note": "approximate, from the tone set"},
+      "in_program": "decoded (ALE decoder from sdr_plugin_navtex) on emissions 1300-3600 Hz wide; tested on synthetic signals only, down to about 0 dB SNR in 2.5 kHz",
+      "match": [
+        {"modulation": "MFSK", "baud": [125], "tones": [8], "spacing_hz": [250], "provenance": "documented", "source": "MIL141"}
+      ]
+    },
+    {
+      "name": "ALE 3G / 4G (WALE)", "family": "automatic link establishment",
+      "modulation": "8-PSK burst waveforms at 2400 symbols/s on an 1800 Hz carrier",
+      "baud": {"value": 2400, "provenance": "documented", "source": "MIL141"},
+      "in_program": "decoded (same decoder) on emissions 1300-3600 Hz wide; tested end to end on synthetic signals, and on the sigidwiki's real samples, whose three bursts arrive intact but protected (linking protection: their CRCs fail) and are reported as such",
+      "match": [
+        {"modulation": "PSK", "baud": [2400], "provenance": "documented", "source": "MIL141"}
+      ]
+    },
+    {
+      "name": "Olivia", "family": "amateur digital",
+      "modulation": "MFSK; submodes named tones/bandwidth (e.g. 8/250, 8/500, 16/500, 32/1000); baud = bandwidth / tones",
+      "in_program": "not decoded; not classified yet",
+      "provenance_note": "parameters by submode, documented in OLIVIA",
+      "match": [
+        {"modulation": "MFSK", "baud": [31.25], "tones": [4], "spacing_hz": [31.25], "provenance": "documented", "source": "OLIVIA", "note": "submode 4/125"},
+        {"modulation": "MFSK", "baud": [62.5], "tones": [4], "spacing_hz": [62.5], "provenance": "documented", "source": "OLIVIA", "note": "submode 4/250"},
+        {"modulation": "MFSK", "baud": [31.25], "tones": [8], "spacing_hz": [31.25], "provenance": "documented", "source": "OLIVIA", "note": "submode 8/250"},
+        {"modulation": "MFSK", "baud": [62.5], "tones": [8], "spacing_hz": [62.5], "provenance": "documented", "source": "OLIVIA", "note": "submode 8/500"},
+        {"modulation": "MFSK", "baud": [31.25], "tones": [16], "spacing_hz": [31.25], "provenance": "documented", "source": "OLIVIA", "note": "submode 16/500"},
+        {"modulation": "MFSK", "baud": [62.5], "tones": [16], "spacing_hz": [62.5], "provenance": "documented", "source": "OLIVIA", "note": "submode 16/1000"},
+        {"modulation": "MFSK", "baud": [31.25], "tones": [32], "spacing_hz": [31.25], "provenance": "documented", "source": "OLIVIA", "note": "submode 32/1000"}
+      ]
+    },
+    {
+      "name": "Contestia", "family": "amateur digital",
+      "modulation": "MFSK derived from Olivia, with shorter symbols blocks and 6-bit characters",
+      "in_program": "not decoded; not classified yet",
+      "provenance_note": "fldigi documentation"
+    },
+    {
+      "name": "MFSK16", "family": "amateur digital",
+      "modulation": "16-tone MFSK",
+      "baud": {"value": 15.625, "provenance": "documented", "source": "MFSK"},
+      "tone_spacing_hz": {"value": 15.625, "provenance": "documented", "source": "MFSK"},
+      "bandwidth_hz": {"value": 316, "provenance": "documented", "source": "MFSK"},
+      "in_program": "not decoded; not classified yet",
+      "match": [
+        {"modulation": "MFSK", "baud": [15.625], "tones": [16], "spacing_hz": [15.625], "provenance": "documented", "source": "MFSK"}
+      ]
+    },
+    {
+      "name": "MFSK32", "family": "amateur digital",
+      "modulation": "16-tone MFSK, twice MFSK16's rate",
+      "baud": {"value": 31.25, "provenance": "documented", "source": "MFSK"},
+      "bandwidth_hz": {"value": 630, "provenance": "documented", "source": "MFSK", "note": "approximate"},
+      "in_program": "not decoded; not classified yet",
+      "match": [
+        {"modulation": "MFSK", "baud": [31.25], "tones": [16], "spacing_hz": [31.25], "provenance": "documented", "source": "MFSK"}
+      ]
+    },
+    {
+      "name": "Feld Hell", "family": "amateur facsimile-like",
+      "modulation": "on-off keyed pixels, 122.5 pixels/s",
+      "baud": {"value": 122.5, "provenance": "documented", "source": "HELL"},
+      "in_program": "not decoded; not classified yet",
+      "match": [
+        {"modulation": "OOK", "provenance": "documented", "source": "HELL"}
+      ]
+    },
+    {
+      "name": "Radiofax (WEFAX)", "family": "image",
+      "modulation": "frequency-modulated subcarrier: black 1500 Hz, white 2300 Hz in a USB receiver tuned 1.9 kHz below the assigned frequency (+-400 Hz; +-150 Hz on long wave); 120 lines a minute (60, 90, 240 exist), index of cooperation 576 or 288; start tone 300 Hz (IOC 576) or 675 Hz (IOC 288), stop tone 450 Hz",
+      "in_program": "decoded (core/src/fax.cpp): recognised from 20 s of lines repeating at one of the line rates; the picture is saved as a PNG, straightened, and aligned when phasing lines were received. Tested on synthetic charts and on the Signal Identification Wiki's recordings: its four samples longer than 25 s give their pictures",
+      "provenance_note": "documented: the WMO facsimile standard (WMO-No. 386) as given in NOAA's Worldwide Marine Radiofacsimile Broadcast Schedules"
+    },
+    {
+      "name": "Time signal", "family": "time and frequency",
+      "modulation": "a carrier or tone marking every second (DCF77: carrier lowered 0.1/0.2 s; MSF: off 0.1-0.5 s; RBU, RWM, BPM, WWV, CHU, JJY, WWVB: pulses or ticks of their own)",
+      "in_program": "recognised by its seconds (core/src/timesig.cpp): the level repeats exactly every second for 12 s; the DCF77 and MSF time codes decoded, a minute reported only when every parity and fixed bit is right. The wiki's DCF77 and MSF recordings decode; 13 of its 20 recordings of ten stations are recognised",
+      "provenance_note": "documented: PTB's DCF77 time code and NPL's MSF time and date code"
+    },
+    {
+      "name": "SSTV", "family": "amateur image",
+      "modulation": "analogue frequency-modulated subcarrier: 1200 Hz sync, 1500-2300 Hz image; VIS header at 1900/1200/1100/1300 Hz",
+      "in_program": "decoded (core/src/sstv.cpp): Martin M1/M2, Scottie S1/S2/DX, Robot 36/72 and PD 50 to 290, from the VIS header or (Martin, Scottie, PD) from the sync pulses' timing; the colour picture is saved as a PNG. Tested on synthetic pictures of every mode and on the Signal Identification Wiki's recordings: 9 of 14 give their pictures (the others: Robot 8, 12 and 24, one Robot recording without its header, one with the sidebands swapped)",
+      "provenance_note": "documented in SSTV (per-mode line timing)"
+    },
+    {
+      "name": "ARDOP", "family": "amateur/emergency data modem",
+      "modulation": "4-FSK, PSK and QAM frames in 200, 500, 1000 or 2000 Hz",
+      "in_program": "not decoded; not classified yet",
+      "provenance_note": "documented in ARDOP"
+    },
+    {
+      "name": "VARA HF", "family": "amateur/emergency data modem",
+      "modulation": "OFDM-like multi-carrier; 2300 Hz standard, 500 Hz narrow",
+      "in_program": "not decoded (proprietary); not classified yet",
+      "provenance_note": "bandwidths from VARA; the waveform is not published in detail"
+    },
+    {
+      "name": "DRM", "family": "digital broadcasting",
+      "modulation": "OFDM, robustness modes A-D, 4.5/5/9/10/18/20 kHz",
+      "bandwidth_hz": {"value": [4500, 5000, 9000, 10000, 18000, 20000], "provenance": "documented", "source": "DRM"},
+      "in_program": "recognised (core/src/drm.cpp) by its OFDM guard interval, with its robustness mode; the programme is not decoded. Narrower than 3.2 kHz: labelled DRM-type OFDM (WinDRM, EasyPal, others may share the timing). 3 of the Signal Identification Wiki's 4 DRM recordings, its WinDRM one and both UK government WinDRM-type ones recognised"
+    },
+    {
+      "name": "SSB voice", "family": "voice",
+      "modulation": "single sideband, suppressed carrier",
+      "bandwidth_hz": {"value": 2700, "provenance": "guess", "note": "typical; 2.4-3 kHz"},
+      "in_program": "not classified yet"
+    },
+    {
+      "name": "AM broadcast", "family": "voice/broadcast",
+      "modulation": "double sideband with carrier",
+      "bandwidth_hz": {"value": 9000, "provenance": "guess", "note": "typical of HF broadcasting (+-4.5 kHz)"},
+      "in_program": "not classified yet; the carrier is detected as a narrow emission inside a wider one"
+    },
+    {
+      "name": "RTTY (other rates and shifts)", "family": "amateur and utility teleprinter",
+      "modulation": "2-FSK, ITA2 start/stop at other rates and shifts",
+      "match": [
+        {
+          "modulation": "FSK",
+          "shift_hz": [85, 170, 425, 450, 850],
+          "baud": [45.45, 50, 75, 100],
+          "provenance": "observed",
+          "source": "SIGIDWIKI",
+          "note": "the wiki's RTTY page lists these shifts; its samples cover these rates"
+        }
+      ],
+      "in_program": "decoded: RTTY decoders at the measured shift and rate (core/README.md); 17 of the wiki's 19 RTTY samples decode"
+    },
+    {
+      "name": "CIS-36-50 (T-600)", "family": "Russian/CIS military",
+      "modulation": "2-FSK, 5-bit characters as 7-bit constant-weight words",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [200, 250, 500], "baud": [50, 100], "provenance": "observed", "source": "PRIYOM-T600", "note": "50 Bd/200 Hz, 50 Bd/250 Hz, 100 Bd/500 Hz"},
+        {"modulation": "FSK", "shift_hz": [1000], "baud": [50], "provenance": "observed", "source": "I56578", "note": "50 Bd/1000 Hz before an Akula burst"},
+        {"modulation": "FSK", "shift_hz": [85, 125, 250, 500], "baud": [36, 50, 75, 100, 150], "provenance": "vendor", "source": "WAVECOM"},
+        {"modulation": "FSK", "shift_hz": [75, 400], "baud": [50], "provenance": "observed", "source": "RIVET"}
+      ],
+      "in_program": "its 7-bit constant-weight code is recognised (core/src/constant_weight.cpp, labelled '4:3 code': other systems use such codes too), nothing decoded; found on 3 of the Signal Identification Wiki's 4 samples"
+    },
+    {
+      "name": "CIS-50-50", "family": "Russian/CIS military",
+      "modulation": "2-FSK; idle dot reversals at 50 Bd",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [85, 125, 200, 250, 500], "baud": [50, 100], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "its 7-bit constant-weight code is recognised (core/src/constant_weight.cpp, labelled '4:3 code': other systems use such codes too), nothing decoded; found on the Signal Identification Wiki's sample"
+    },
+    {
+      "name": "CIS-12", "family": "Russian/CIS military",
+      "modulation": "12 DBPSK/DQPSK subcarriers 200 Hz apart, 120 Bd, pilot at +3300 Hz",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [120], "tones": [12], "spacing_hz": [200], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CIS BPSK 1200", "family": "Russian/CIS military",
+      "modulation": "BPSK/SDPSK at 1200 Bd, about 2.5 kHz; a 512-bit block every 426.67 ms",
+      "match": [
+        {"modulation": "PSK", "baud": [1200], "frame_ms": [426.67], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CIS MFSK-16 (XPA2)", "family": "Russian/CIS",
+      "modulation": "MFSK, 14 of 16 tone slots, 15 Hz apart, 7.5 Bd",
+      "match": [
+        {"modulation": "MFSK", "baud": [7.5], "tones_range": [8, 16], "spacing_hz": [15], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CIS-112", "family": "Russian/CIS military",
+      "modulation": "OFDM, 112 DQPSK tones at 22.22 Bd; tone spacing not published",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [22.22], "tones_range": [90, 112], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CIS-3000", "family": "Russian/CIS military",
+      "modulation": "8PSK at 3000 Bd, about 3.4 kHz",
+      "match": [
+        {"modulation": "PSK", "baud": [3000], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only (wider than the program's 2.6 kHz measuring channel)"
+    },
+    {
+      "name": "CIS-20", "family": "Russian/CIS military",
+      "modulation": "OFDM, 20 DQPSK tones at 75 Bd, pilot at +3300 Hz, about 2.75 kHz",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [75], "tones_range": [18, 21], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CROWD36 (CIS-36 MFSK)", "family": "Russian/CIS",
+      "modulation": "MFSK, 36 tones 40 Hz apart",
+      "match": [
+        {"modulation": "MFSK", "baud": [10, 20, 40], "tones_range": [12, 36], "spacing_hz": [40], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "Akula", "family": "Russian/CIS Navy",
+      "modulation": "FSK bursts; also a BPSK burst (Akula II) and a 15-carrier DBPSK form",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [1000], "baud": [500], "provenance": "measured", "source": "RESEARCH-3.6"},
+        {"modulation": "FSK", "shift_hz": [1000], "baud": [100], "provenance": "observed", "source": "USER-SA", "note": "the 100 Bd variant (2020)"},
+        {"modulation": "PSK", "baud": [500], "provenance": "observed", "source": "I56578", "note": "Akula II"}
+      ],
+      "in_program": "recognised by its published sync and end groups (core/src/akula.cpp), not decoded; found on the recording of docs/RESEARCH.md section 3.6, where the groups were first checked"
+    },
+    {
+      "name": "Serdolik (command state)", "family": "Russian/CIS diplomatic",
+      "modulation": "MFSK, 35 tones at 40 Bd; tone spacing not published",
+      "match": [
+        {"modulation": "MFSK", "baud": [40], "tones_range": [12, 35], "provenance": "observed", "source": "PRIYOM-SERDOLIK"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "STANAG 4285", "family": "NATO",
+      "modulation": "serial PSK at 2400 Bd on 1800 Hz; 106.67 ms frames",
+      "match": [
+        {"modulation": "PSK", "baud": [2400], "frame_ms": [106.67], "provenance": "vendor", "source": "WAVECOM", "note": "frame: 256 symbols, an 80-symbol preamble in every one"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "STANAG 4529", "family": "NATO",
+      "modulation": "serial PSK at 1200 Bd; 213.33 ms frames; 1240 Hz",
+      "match": [
+        {"modulation": "PSK", "baud": [1200], "frame_ms": [213.33], "provenance": "vendor", "source": "WAVECOM", "note": "frame: 80 + 176 symbols"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "STANAG 4539 / MIL-STD-188-110 App C", "family": "NATO",
+      "modulation": "serial PSK/QAM at 2400 Bd on 1800 Hz; 119.6 ms frames",
+      "match": [
+        {"modulation": "PSK", "baud": [2400], "frame_ms": [119.6], "provenance": "vendor", "source": "WAVECOM", "frame_provenance": "observed", "frame_source": "SIGIDWIKI", "note": "frame: 256 data + 31 probe symbols. The probes are not the same in every frame, so the signal can repeat at a multiple of it instead (docs/RESEARCH.md section 3.7)"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "MIL-STD-188-110 serial / STANAG 4415", "family": "NATO",
+      "modulation": "serial 8PSK at 2400 Bd on 1800 Hz; its probes repeat every 66.67 or 200 ms",
+      "match": [
+        {"modulation": "PSK", "baud": [2400], "frame_ms": [66.67, 200], "provenance": "vendor", "source": "WAVECOM", "frame_provenance": "observed", "frame_source": "I56578-SCRAMBLER", "note": "frame: the scrambler restarts every 160 symbols (I56578-SCRAMBLER, quoting the standard), so the known probe symbols repeat every 160 symbols (66.67 ms) with 20 data / 20 probe frames (up to 1200 bps, and 110A-MOD) and every 480 (200 ms) with 32/16 frames (2400 and 4800 bps); the preamble is built of 200 ms segments (WAVECOM). Both periods measured on the wiki's samples (docs/RESEARCH.md section 3.7)"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "MIL-STD-188-110 App A (16-tone)", "family": "NATO",
+      "modulation": "16 tones, 75 Bd DQPSK/BPSK, Doppler pilot at 605 Hz",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [75], "tones_range": [14, 17], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "MIL-STD-188-110 App B (39-tone) / STANAG 4197", "family": "NATO",
+      "modulation": "39 tones at 44.44 Bd",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [44.44], "tones_range": [30, 40], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "HFDL", "family": "aeronautical",
+      "modulation": "burst PSK at 1800 Bd on a 1440 Hz subcarrier",
+      "match": [
+        {"modulation": "PSK", "baud": [1800], "provenance": "observed", "source": "DUMPHFDL"}
+      ],
+      "in_program": "decoded (core/src/hfdl.cpp): PDUs whose frame check is right, all the time on channels a frequency list names, else on emissions 1800-3600 Hz wide. Tested on synthetic bursts of every mode and on the five recordings of the Signal Identification Wiki (19 of their 21 bursts; no 8PSK among them)"
+    },
+    {
+      "name": "Link-11 CLEW", "family": "NATO",
+      "modulation": "16 DQPSK tones 110 Hz apart (935-2365 Hz plus 2915 Hz), Doppler tone 605 Hz",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [75, 45.45], "tones_range": [14, 18], "spacing_hz": [110], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "Link-11 SLEW", "family": "NATO",
+      "modulation": "serial PSK at 2400 Bd on 1800 Hz (QPSK per Wavecom, 8PSK per sigidwiki)",
+      "match": [
+        {"modulation": "PSK", "baud": [2400], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CODAN Selcal", "family": "commercial",
+      "modulation": "FSK 100 Bd, mark 1870 / space 1700 Hz, ITU-R M.493 alphabet",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [170], "baud": [100], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CODAN 3212", "family": "commercial",
+      "modulation": "serial PSK/QAM at 1800 Bd centred on 1500 Hz",
+      "match": [
+        {"modulation": "PSK", "baud": [1800], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CODAN chirp (ALE)", "family": "commercial",
+      "modulation": "32 DBPSK carriers 80 Hz apart at 80 Bd, 2560 Hz",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [80], "tones_range": [24, 32], "spacing_hz": [80], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "CODAN 9001", "family": "commercial",
+      "modulation": "16 DQPSK tones 112.5 Hz apart at 75 Bd",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [75], "tones_range": [14, 17], "spacing_hz": [112.5], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "DSC-HF", "family": "maritime",
+      "modulation": "FSK 100 Bd, 170 Hz, 10-bit symbols (ITU-R M.493)",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [170], "baud": [100], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "decoded (core/src/dsc.cpp): calls whose error-check character is right. Tested on synthetic calls and on the four HF recordings of the Signal Identification Wiki"
+    },
+    {
+      "name": "SITOR-A", "family": "maritime",
+      "modulation": "FSK ARQ, 100 Bd, 450 ms cycle",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [170], "baud": [100], "provenance": "vendor", "source": "WAVECOM"},
+        {"modulation": "FSK", "shift_hz": [300, 400, 850], "baud": [100], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "PACTOR I", "family": "amateur and commercial",
+      "modulation": "FSK ARQ, 200 Hz shift, 1.25 s cycle",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [200], "baud": [100, 200], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "PACTOR II", "family": "amateur and commercial",
+      "modulation": "two DPSK channels at 100 Bd, about 450-500 Hz",
+      "match": [
+        {"modulation": "PSK", "baud": [100], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "PACTOR III", "family": "amateur and commercial",
+      "modulation": "2-18 DBPSK/DQPSK tones 120 Hz apart at 100 Bd",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [100], "tones_range": [2, 18], "spacing_hz": [120], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "Polish F11", "family": "Polish military (inactive since 2018)",
+      "modulation": "FSK 100 Bd, 625 Hz",
+      "match": [
+        {"modulation": "FSK", "shift_hz": [625], "baud": [100], "provenance": "observed", "source": "SIGIDWIKI"}
+      ],
+      "in_program": "measured only"
+    },
+    {
+      "name": "Chinese 4+4", "family": "Chinese",
+      "modulation": "8 DQPSK tones at 75 Bd, 300/450 Hz apart",
+      "match": [
+        {"modulation": "multi-carrier", "baud": [75], "tones_range": [6, 8], "spacing_hz": [300, 450], "provenance": "vendor", "source": "WAVECOM"}
+      ],
+      "in_program": "measured only"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+/build*/
+*.sigmf-data
+*.sigmf-meta
+sdrc_probe_report.json
+__pycache__/
+sigidwiki_cache/
+sigidwiki_report.*
+/tsan/
+/asan/
+# Your own recordings and diagnostic reports: never in the repository.
+/recordings/
+hfc_report_*.zip
+*.wav
